@@ -12,26 +12,42 @@ class RelationBert(BertPreTrainedModel):
 
         self.num_labels = config.num_labels
 
-        self.cls_fc_layer = FCLayer(config.hidden_size, config.hidden_size, dropout_rate)
-        self.entity_fc_layer = FCLayer(config.hidden_size, config.hidden_size, dropout_rate)
-        self.dim_reduction_fc_layer = FCLayer(config.hidden_size * 3, output_size, dropout_rate)
+        self.cls_fc_layer = FCLayer(
+            input_dim=config.hidden_size,
+            output_dim=config.hidden_size,
+            hidden_dim=config.hidden_size // 2,
+            dropout_rate=dropout_rate,
+        )
+        self.entity_fc_layer = FCLayer(
+            input_dim=config.hidden_size,
+            output_dim=config.hidden_size,
+            hidden_dim=config.hidden_size // 2,
+            dropout_rate=dropout_rate,
+        )
+        self.dim_reduction_fc_layer = FCLayer(
+            input_dim=config.hidden_size * 3,
+            output_dim=output_size,
+            hidden_dim=config.hidden_size,
+            dropout_rate=dropout_rate,
+        )
         self.label_classifier = FCLayer(
-            output_size,
-            config.num_labels,
-            dropout_rate,
+            input_dim=output_size,
+            output_dim=config.num_labels,
+            hidden_dim=output_size // 2,
+            dropout_rate=dropout_rate,
             use_activation=False,
         )
 
-    def forward(self, input_ids, attention_mask, token_type_ids, e1_mask, e2_mask, labels):
+    def forward(self, input_ids, attention_masks, token_type_ids, e1_masks, e2_masks, labels):
         outputs = self.bert(
-            input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids
+            input_ids, attention_mask=attention_masks, token_type_ids=token_type_ids
         )  # sequence_output, pooled_output, (hidden_states), (attentions)
         sequence_output = outputs[0]
         pooled_output = outputs[1]  # [CLS]
 
         # Average
-        e1_h = self._entity_average(sequence_output, e1_mask)
-        e2_h = self._entity_average(sequence_output, e2_mask)
+        e1_h = self._entity_average(sequence_output, e1_masks)
+        e2_h = self._entity_average(sequence_output, e2_masks)
 
         # Dropout -> tanh -> fc_layer (Share FC layer for e1 and e2)
         pooled_output = self.cls_fc_layer(pooled_output)
@@ -52,7 +68,7 @@ class RelationBert(BertPreTrainedModel):
                 loss = loss_fct(logits.view(-1), labels.view(-1))
             else:
                 loss_fct = nn.CrossEntropyLoss()
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+                loss = loss_fct(logits, labels)
 
             outputs = (loss,) + outputs
 

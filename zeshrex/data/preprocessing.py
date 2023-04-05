@@ -85,13 +85,18 @@ class RelationTokenizationPreprocessor(BasePreprocessor):
         e22_p += 1
 
         special_tokens_count = 1
-        if len(tokens) > self.max_len - special_tokens_count:
-            tokens = tokens[:(self.max_len - special_tokens_count)]
+        max_len = self.max_len - special_tokens_count
+
+        assert e12_p < max_len and e22_p < max_len, 'Index of special token is grater than max lenght!'
+
+        if len(tokens) > max_len:
+            tokens = tokens[:(max_len)]
 
         token_type_ids = [self.sequence_a_segment_id] * len(tokens)
 
         tokens = [self.cls_token] + tokens
         token_type_ids = [self.cls_token_segment_id] + token_type_ids
+        # NOTE: we are filling all with cls_token_id as we have context only and no [SEP] token with 2nd sentence
 
         input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
 

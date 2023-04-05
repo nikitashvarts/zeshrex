@@ -1,22 +1,27 @@
 gpu: 0
 seed: 42
 n_workers: 1
+models_output_dir: './models/'
 output_dir: './tmp/'
+log_frequency: 10
 
 train:
-  batch_size: 4
-  num_epochs: 10
-  weight_decay: 0.01
-  learning_rate: 5.0e-5  # The initial learning rate for Adam.
-  warmup_steps: 100
-  adam_epsilon: 1.0e-8  # Epsilon for Adam optimizer.
+  batch_size: 64
+  num_epochs: 15
+  weight_decay: 0.1
+  learning_rate: 2.0e-4  # The initial learning rate for Adam.
+  warmup_steps: 500
+  adam_epsilon: 1.0e-6  # Epsilon for Adam optimizer.
+  max_grad_norm: 1.0  # Max gradient norm.
   gradient_accumulation_steps: 1  # Number of updates steps to accumulate before performing a backward/update pass
+  eval_frequency: 10000
+  eval_batch_size: 64
 
 model:
-  name: 'bert-base-uncased'
+  name: 'bert-large-cased'
   use_pretrain: ''
   output_size: 512
-  dropout_rate: 0.1
+  dropout_rate: 0.25
   hidden_size: 512
   hidden_act: 'gelu'
   initializer_range: 0.02
@@ -31,6 +36,7 @@ model:
 
 data:
   dataset_path: './datasets/SemEval2010_task8/'
-  train_data_file_name: 'TRAIN_FILE.TXT'
-  test_data_file_name: 'TEST_FILE_FULL.TXT'
-  max_len: 60
+  relations_file_path: 'relation_names.txt'
+  train_data_file_path: 'TRAIN_FILE.TXT'
+  test_data_file_path: 'TEST_FILE_FULL.TXT'
+  max_len: 200
