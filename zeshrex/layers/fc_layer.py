@@ -5,12 +5,12 @@ from torch import nn
 
 class FCLayer(nn.Module):
     def __init__(
-            self,
-            input_dim: int,
-            output_dim: int,
-            hidden_dim: int = 0,
-            dropout_rate: float = 0.2,
-            use_activation: bool = True,
+        self,
+        input_dim: int,
+        output_dim: int,
+        hidden_dim: int = 0,
+        dropout_rate: float = 0.2,
+        use_activation: bool = True,
     ):
         super(FCLayer, self).__init__()
         self.use_activation = use_activation

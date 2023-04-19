@@ -22,7 +22,7 @@ def eval_model(model: Model, device: torch.device, dataloader: DataLoader, relat
                 'token_type_ids': batch[2],
                 'e1_masks': batch[3],
                 'e2_masks': batch[4],
-                'labels': batch[5]
+                'labels': batch[5],
             }
 
             (loss, logits), embeddings = model(**inputs)
@@ -32,7 +32,10 @@ def eval_model(model: Model, device: torch.device, dataloader: DataLoader, relat
             true_labels = inputs['labels'].cpu().detach().numpy()
 
             precision, recall, f1_score, support = precision_recall_fscore_support(
-                y_true=true_labels, y_pred=pred_labels, labels=list(relations.values()), zero_division=0,
+                y_true=true_labels,
+                y_pred=pred_labels,
+                labels=list(relations.values()),
+                zero_division=0,
             )
 
             metrics['precision'] = metrics.get('precision', []) + [precision]

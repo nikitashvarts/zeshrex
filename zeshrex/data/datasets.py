@@ -15,11 +15,11 @@ DataIndex = Optional[List[int]]
 
 class RelationDataset(Dataset):
     def __init__(
-            self,
-            data: Data,
-            relations: List[str],
-            indexes: Optional[Tuple[DataIndex, DataIndex, DataIndex]] = None,
-            text_processor: Optional[BasePreprocessor] = None,
+        self,
+        data: Data,
+        relations: List[str],
+        indexes: Optional[Tuple[DataIndex, DataIndex, DataIndex]] = None,
+        text_processor: Optional[BasePreprocessor] = None,
     ) -> None:
         self._dataset = data
 
@@ -49,9 +49,7 @@ class RelationDataset(Dataset):
 
     @classmethod
     def from_directory(
-            cls,
-            dir_path: os.PathLike,
-            text_processor: Optional[BasePreprocessor] = None
+        cls, dir_path: os.PathLike, text_processor: Optional[BasePreprocessor] = None
     ) -> 'RelationDataset':
         _DATA_FILE_NAME = 'data.tsv'
         _INDEX_FILE_NAME_TEMPLATE = '{}_index.txt'
@@ -63,8 +61,9 @@ class RelationDataset(Dataset):
         test_index = cls._load_index(dir_path / _INDEX_FILE_NAME_TEMPLATE.format('test'))
         val_index = cls._load_index(dir_path / _INDEX_FILE_NAME_TEMPLATE.format('val'))
 
-        assert len(data) == sum([len(idx) if idx is not None else 0 for idx in (train_index, test_index, val_index)]), \
-            "Lengths of data and all indexes are not equal! Check consistency of your data!"
+        assert len(data) == sum(
+            [len(idx) if idx is not None else 0 for idx in (train_index, test_index, val_index)]
+        ), 'Lengths of data and all indexes are not equal! Check consistency of your data!'
 
         return cls(
             data=data, indexes=(train_index, test_index, val_index), relations=relations, text_processor=text_processor
@@ -85,39 +84,50 @@ class RelationDataset(Dataset):
         return self._relation_to_label.copy()
 
     def generate_train_test_split(
-            self, use_predefined_split: bool = True
+        self, use_predefined_split: bool = True
     ) -> Tuple['RelationDataset', 'RelationDataset', 'RelationDataset']:
         relations = list(self._relation_to_label.keys())
         if use_predefined_split:
             split_data: Dict[str, Data] = {}
             for sample in self._dataset:
-                if self._train_index and sample['index'] in self._train_index:
-                    split_data['train'] = split_data.get('train', []) + [sample]
-                    continue
+                if self._train_index is not None:
+                    if sample['index'] in self._train_index:
+                        split_data['train'] = split_data.get('train', []) + [sample]
+                        continue
 
-                if self._test_index and sample['index'] in self._test_index:
-                    split_data['test'] = split_data.get('test', []) + [sample]
-                    continue
+                if self._test_index is not None:
+                    if sample['index'] in self._test_index:
+                        split_data['test'] = split_data.get('test', []) + [sample]
+                        continue
 
-                if self._val_index and sample['index'] in self._val_index:
-                    split_data['val'] = split_data.get('val', []) + [sample]
-                    continue
+                if self._val_index is not None:
+                    if sample['index'] in self._val_index:
+                        split_data['val'] = split_data.get('val', []) + [sample]
+                        continue
 
             split = (
                 RelationDataset(
-                    split_data.get('train', {}), relations, (self._train_index, None, None), self._text_processor,
+                    split_data.get('train', {}),
+                    relations,
+                    (self._train_index, None, None),
+                    self._text_processor,
                 ),
                 RelationDataset(
-                    split_data.get('test', {}), relations, (None, self._test_index, None), self._text_processor,
+                    split_data.get('test', {}),
+                    relations,
+                    (None, self._test_index, None),
+                    self._text_processor,
                 ),
                 RelationDataset(
-                    split_data.get('val', {}), relations, (None, None, self._val_index), self._text_processor,
+                    split_data.get('val', {}),
+                    relations,
+                    (None, None, self._val_index),
+                    self._text_processor,
                 ),
             )
 
             return split
-        else:
-            raise NotImplementedError('Random or zero-shot split is not defined yet!')
+        raise NotImplementedError('Random or zero-shot split is not defined yet!')
 
     @staticmethod
     def collate_data(batch: List[Tuple[Tuple[Iterable, ...], int]]) -> List[torch.Tensor]:

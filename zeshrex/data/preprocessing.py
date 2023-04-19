@@ -25,9 +25,9 @@ class SentenceTokenizationPreprocessor(BasePreprocessor):
             tokenized_dict = self.tokenizer.encode_plus(text, truncation=False)
             input_ids, input_masks = tokenized_dict['input_ids'], tokenized_dict['attention_mask']
 
-            input_ids = input_ids[-self.max_len:]
+            input_ids = input_ids[-self.max_len :]
             input_ids[0] = self.cls_id
-            input_masks = input_masks[-self.max_len:]
+            input_masks = input_masks[-self.max_len :]
             input_ids += [self.pad_id] * (self.max_len - len(input_ids))
             input_masks += [0] * (self.max_len - len(input_masks))
 
@@ -35,10 +35,9 @@ class SentenceTokenizationPreprocessor(BasePreprocessor):
             assert len(input_masks) == self.max_len
 
         else:
-            tokenized_dict = self.tokenizer.encode_plus(text,
-                                                        max_length=self.max_len,
-                                                        pad_to_max_length=True,
-                                                        truncation=True)
+            tokenized_dict = self.tokenizer.encode_plus(
+                text, max_length=self.max_len, pad_to_max_length=True, truncation=True
+            )
             input_ids, input_masks = tokenized_dict['input_ids'], tokenized_dict['attention_mask']
 
             assert len(input_ids) == self.max_len
@@ -51,7 +50,7 @@ class RelationTokenizationPreprocessor(BasePreprocessor):
     def __init__(self, tokenizer, max_len: int, relation_tokens: Optional[List[str]] = None):
         self.tokenizer = tokenizer
         if relation_tokens is not None:
-            self.tokenizer.add_special_tokens({"additional_special_tokens": relation_tokens})
+            self.tokenizer.add_special_tokens({'additional_special_tokens': relation_tokens})
 
         self.max_len = max_len
 
@@ -67,16 +66,16 @@ class RelationTokenizationPreprocessor(BasePreprocessor):
     def __call__(self, text: str):
         tokens: List[str] = self.tokenizer.tokenize(text)
 
-        e11_p = tokens.index("<e1>")  # the start position of entity1
-        e12_p = tokens.index("</e1>")  # the end position of entity1
-        e21_p = tokens.index("<e2>")  # the start position of entity2
-        e22_p = tokens.index("</e2>")  # the end position of entity2
+        e11_p = tokens.index('<e1>')  # the start position of entity1
+        e12_p = tokens.index('</e1>')  # the end position of entity1
+        e21_p = tokens.index('<e2>')  # the start position of entity2
+        e22_p = tokens.index('</e2>')  # the end position of entity2
 
         # Replace the token
-        tokens[e11_p] = "$"
-        tokens[e12_p] = "$"
-        tokens[e21_p] = "#"
-        tokens[e22_p] = "#"
+        tokens[e11_p] = '$'
+        tokens[e12_p] = '$'
+        tokens[e21_p] = '#'
+        tokens[e22_p] = '#'
 
         # Add 1 because of the [CLS] token
         e11_p += 1
@@ -118,10 +117,12 @@ class RelationTokenizationPreprocessor(BasePreprocessor):
         for i in range(e21_p, e22_p + 1):
             e2_mask[i] = 1
 
-        assert len(input_ids) == self.max_len, f"Error with input length {len(input_ids)} vs {self.max_len}"
-        assert len(attention_mask) == self.max_len, \
-            f"Error with attention mask length {len(attention_mask)} vs {self.max_len}"
-        assert len(token_type_ids) == self.max_len, \
-            f"Error with token type length {len(token_type_ids)} vs {self.max_len}"
+        assert len(input_ids) == self.max_len, f'Error with input length {len(input_ids)} vs {self.max_len}'
+        assert (
+            len(attention_mask) == self.max_len
+        ), f'Error with attention mask length {len(attention_mask)} vs {self.max_len}'
+        assert (
+            len(token_type_ids) == self.max_len
+        ), f'Error with token type length {len(token_type_ids)} vs {self.max_len}'
 
         return input_ids, attention_mask, token_type_ids, e1_mask, e2_mask

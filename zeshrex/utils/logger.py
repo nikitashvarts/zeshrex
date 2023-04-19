@@ -5,9 +5,9 @@ from typing import Optional
 from zeshrex import PROJECT_PATH
 
 
-def init_logger(name: Optional[str] = None,
-                file_name: Optional[str] = None,
-                level: int = logging.INFO) -> logging.Logger:
+def init_logger(
+    name: Optional[str] = None, file_name: Optional[str] = None, level: int = logging.INFO
+) -> logging.Logger:
     """
     Initializes a logger for handling the output. Includes 2 handlers:
         - StreamHandler (always active) for printing to console

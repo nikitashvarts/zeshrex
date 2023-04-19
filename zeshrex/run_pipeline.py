@@ -27,7 +27,7 @@ def run_pipeline():
     # --------
     tokenizer = BertTokenizer.from_pretrained(pretrained_model_name_or_path=config.model.name)
     text_preprocessor = RelationTokenizationPreprocessor(
-        tokenizer=tokenizer, max_len=config.data.max_len, relation_tokens=["<e1>", "</e1>", "<e2>", "</e2>"]
+        tokenizer=tokenizer, max_len=config.data.max_len, relation_tokens=['<e1>', '</e1>', '<e2>', '</e2>']
     )
 
     dataset = RelationDataset.from_directory(
@@ -51,9 +51,8 @@ def run_pipeline():
 
     # PARAMETERS
     # ----------
-    num_training_steps = \
-        len(train_dataloader) // config.train.gradient_accumulation_steps * config.train.num_epochs
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    num_training_steps = len(train_dataloader) // config.train.gradient_accumulation_steps * config.train.num_epochs
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # MODEL
     # -----
@@ -71,17 +70,14 @@ def run_pipeline():
 
     # OPTIMIZER
     # ---------
-    no_decay = ["bias", "LayerNorm.weight"]
+    no_decay = ['bias', 'LayerNorm.weight']
 
     optimizer_grouped_parameters = [
         {
-            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-            "weight_decay": config.train.weight_decay,
+            'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+            'weight_decay': config.train.weight_decay,
         },
-        {
-            "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
-            "weight_decay": 0.0
-        },
+        {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0},
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=config.train.learning_rate, eps=config.train.adam_epsilon)
     scheduler = get_linear_schedule_with_warmup(
@@ -115,7 +111,7 @@ def run_pipeline():
                 'token_type_ids': batch[2],
                 'e1_masks': batch[3],
                 'e2_masks': batch[4],
-                'labels': batch[5]
+                'labels': batch[5],
             }
 
             (loss, logits), embeddings = model(**inputs)
@@ -157,7 +153,7 @@ def run_pipeline():
                     if val_result['eval_loss'] < best_eval_loss:
                         best_eval_loss = val_result['eval_loss']
                         state_save_path = state_save_path_template.format(epoch, global_step)
-                        logging.info(f"[Saving at] {state_save_path}")
+                        logging.info(f'[Saving at] {state_save_path}')
                         torch.save(model.state_dict(), state_save_path)
 
 
@@ -173,7 +169,7 @@ if __name__ == '__main__':
     config: SimpleNamespace = load_yaml_config(CONFIG_FILE_PATH, convert_to_namespace=True)
     print_configs(config, print_function=logging.info)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(config.gpu)
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(config.gpu)
     set_seed(config.seed)
 
     run_pipeline()

@@ -1,3 +1,4 @@
+# pylint: skip-file
 import copy
 import json
 import xml.etree.ElementTree as Et
@@ -7,7 +8,6 @@ from xml.dom import minidom
 
 
 class Triple:
-
     def __init__(self, s, p, o):
         self.s = s
         self.o = o
@@ -18,7 +18,6 @@ class Triple:
 
 
 class Tripleset:
-
     def __init__(self):
         self.triples = []
         self.clusterid = 0
@@ -31,7 +30,6 @@ class Tripleset:
 
 
 class Lexicalisation:
-
     def __init__(self, lex, lid, comment='', lang=''):
         self.lex = lex
         self.id = lid
@@ -43,7 +41,6 @@ class Lexicalisation:
 
 
 class Entry:
-
     def __init__(self, category, size, eid, shape, shape_type):
         self.category = category
         self.size = size
@@ -58,7 +55,7 @@ class Entry:
 
     def fill_originaltriple(self, xml_t):
         otripleset = Tripleset()
-        self.originaltripleset.append(otripleset)   # multiple originaltriplesets for one entry
+        self.originaltripleset.append(otripleset)  # multiple originaltriplesets for one entry
         otripleset.fill_tripleset(xml_t)
 
     def fill_modifiedtriple(self, xml_t):
@@ -129,7 +126,6 @@ class Entry:
 
 
 class Benchmark:
-
     def __init__(self):
         self.entries = []
 
@@ -338,14 +334,22 @@ class Benchmark:
                 for link in entry.links:
                     links.append({'subject': link.s, 'property': link.p, 'object': link.o})
 
-            data['entries'].append({entry_id: {'category': entry.category, 'size': entry.size, 'xml_id': entry.id,
-                                               'shape': entry.shape, 'shape_type': entry.shape_type,
-                                               'originaltriplesets': orig_triplesets,
-                                               'modifiedtripleset': modif_tripleset,
-                                               'lexicalisations': lexs,
-                                               'dbpedialinks': dbpedialinks,
-                                               'links': links}
-                                    })
+            data['entries'].append(
+                {
+                    entry_id: {
+                        'category': entry.category,
+                        'size': entry.size,
+                        'xml_id': entry.id,
+                        'shape': entry.shape,
+                        'shape_type': entry.shape_type,
+                        'originaltriplesets': orig_triplesets,
+                        'modifiedtripleset': modif_tripleset,
+                        'lexicalisations': lexs,
+                        'dbpedialinks': dbpedialinks,
+                        'links': links,
+                    }
+                }
+            )
 
         with open(path + '/' + filename, 'w+', encoding='utf8') as outfile:
             json.dump(data, outfile, ensure_ascii=False, indent=4, sort_keys=True)
@@ -357,9 +361,17 @@ class Benchmark:
         for index, entry in enumerate(self.entries):
             if recalc_id:
                 entry.id = str(index + 1)
-            entry_xml = Et.SubElement(entries_xml, 'entry',
-                                      attrib={'category': entry.category, 'eid': entry.id, 'size': entry.size,
-                                              'shape': entry.shape, 'shape_type': entry.shape_type})
+            entry_xml = Et.SubElement(
+                entries_xml,
+                'entry',
+                attrib={
+                    'category': entry.category,
+                    'eid': entry.id,
+                    'size': entry.size,
+                    'shape': entry.shape,
+                    'shape_type': entry.shape_type,
+                },
+            )
             for otripleset in entry.originaltripleset:
                 otripleset_xml = Et.SubElement(entry_xml, 'originaltripleset')
                 for triple in otripleset.triples:
@@ -370,8 +382,9 @@ class Benchmark:
                 mtriple_xml = Et.SubElement(mtripleset_xml, 'mtriple')
                 mtriple_xml.text = mtriple.s + ' | ' + mtriple.p + ' | ' + mtriple.o
             for lex in entry.lexs:
-                lex_xml = Et.SubElement(entry_xml, 'lex', attrib={'comment': lex.comment, 'lid': lex.id,
-                                                                  'lang': lex.lang})
+                lex_xml = Et.SubElement(
+                    entry_xml, 'lex', attrib={'comment': lex.comment, 'lid': lex.id, 'lang': lex.lang}
+                )
                 lex_xml.text = lex.lex
             if entry.dbpedialinks:
                 dbpedialinks_xml = Et.SubElement(entry_xml, 'dbpedialinks')
@@ -391,15 +404,32 @@ class Benchmark:
 
     @staticmethod
     def categories():
-        return ['Airport', 'Artist', 'Astronaut', 'Athlete', 'Building', 'CelestialBody', 'City',
-                'ComicsCharacter', 'Company', 'Food', 'MeanOfTransportation', 'Monument',
-                'Politician', 'SportsTeam', 'University', 'WrittenWork']
+        return [
+            'Airport',
+            'Artist',
+            'Astronaut',
+            'Athlete',
+            'Building',
+            'CelestialBody',
+            'City',
+            'ComicsCharacter',
+            'Company',
+            'Food',
+            'MeanOfTransportation',
+            'Monument',
+            'Politician',
+            'SportsTeam',
+            'University',
+            'WrittenWork',
+        ]
 
 
 def select_files(topdir, category='', size=(1, 8)):
-    finaldirs = [topdir+'/'+str(item)+'triples' for item in range(size[0], size[1])]
+    finaldirs = [topdir + '/' + str(item) + 'triples' for item in range(size[0], size[1])]
 
     finalfiles = []
     for item in finaldirs:
-        finalfiles += [(item, filename) for filename in sorted(listdir(item)) if category in filename and '.xml' in filename]
+        finalfiles += [
+            (item, filename) for filename in sorted(listdir(item)) if category in filename and '.xml' in filename
+        ]
     return finalfiles

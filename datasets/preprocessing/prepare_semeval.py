@@ -21,8 +21,8 @@ def load_args() -> Dict[str, Any]:
 
 
 def load_data(
-        data_path: os.PathLike,
-        relation_names: Optional[List[str]] = None,
+    data_path: os.PathLike,
+    relation_names: Optional[List[str]] = None,
 ) -> Tuple[List[Dict[str, Any]], List[int]]:
     logging.info(f'Loading dataset from {data_path}')
 
@@ -47,7 +47,7 @@ def load_data(
         text_id = int(raw_id_and_text.split('\t')[0])
         text = raw_id_and_text.split('\t')[-1].strip('\n').strip('\"')
         relation_name = raw_relation_type.strip('\n')
-        comment = raw_comment.strip('\n').split(':', 1)[-1].strip()
+        # comment = raw_comment.strip('\n').split(':', 1)[-1].strip()
         if relation_names is not None:
             assert relation_name in relation_names, f'Unknown relation {relation_name}!'
         else:

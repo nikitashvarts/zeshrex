@@ -2,7 +2,6 @@ import argparse
 import json
 import logging
 import os
-import random
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional
 
@@ -34,10 +33,10 @@ def load_relation_aliases(file_path: os.PathLike) -> Dict[str, str]:
 
 
 def load_data(
-        data_path: os.PathLike,
-        relation_names: Optional[List[str]] = None,
-        relation_aliases: Optional[Dict[str, str]] = None,
-        initial_index: int = 1,
+    data_path: os.PathLike,
+    relation_names: Optional[List[str]] = None,
+    relation_aliases: Optional[Dict[str, str]] = None,
+    initial_index: int = 1,
 ) -> Tuple[List[Dict[str, Any]], List[int]]:
     logging.info(f'Loading dataset from {data_path}')
     assert Path(data_path).exists(), f'Data file not found! {data_path}'
@@ -92,10 +91,10 @@ def load_data(
                         first_beg, second_beg = obj_begin, sub_begin
 
                     text = raw_text[:first_beg]
-                    text += '<e1>' + raw_text[first_beg:(first_beg + len(first))] + '</e1>'
-                    text += raw_text[(first_beg + len(first)):second_beg]
-                    text += '<e2>' + raw_text[second_beg:(second_beg + len(second))] + '</e2>'
-                    text += raw_text[(second_beg + len(second)):]
+                    text += '<e1>' + raw_text[first_beg : (first_beg + len(first))] + '</e1>'
+                    text += raw_text[(first_beg + len(first)) : second_beg]
+                    text += '<e2>' + raw_text[second_beg : (second_beg + len(second))] + '</e2>'
+                    text += raw_text[(second_beg + len(second)) :]
                     sample = {
                         'index': current_index,
                         'relation': single_relation,
@@ -131,9 +130,7 @@ def main(args: Dict[str, Any]) -> None:
     test_data, test_index = load_data(
         test_data_path, relation_names, relation_aliases, initial_index=max(train_index) + 1
     )
-    dev_data, dev_index = load_data(
-        dev_data_path, relation_names, relation_aliases, initial_index=max(test_index) + 1
-    )
+    dev_data, dev_index = load_data(dev_data_path, relation_names, relation_aliases, initial_index=max(test_index) + 1)
 
     joined_data = [*train_data, *test_data, *dev_data]
 

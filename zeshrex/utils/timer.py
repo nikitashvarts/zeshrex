@@ -2,11 +2,12 @@ from time import time
 from typing import Callable, Optional
 
 
-class Timer(object):
-    def __init__(self, description: Optional[str] = None,
-                 print_function: Callable = print):
+class Timer:
+    def __init__(self, description: Optional[str] = None, print_function: Callable = print):
         self.description = description
         self.print_function = print_function
+        self.start = None
+        self.end = None
 
     def __enter__(self):
         self.start = time()
