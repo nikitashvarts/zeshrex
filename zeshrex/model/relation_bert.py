@@ -15,25 +15,21 @@ class RelationBert(BertPreTrainedModel):
         self.cls_fc_layer = FCLayer(
             input_dim=config.hidden_size,
             output_dim=config.hidden_size,
-            hidden_dim=config.hidden_size // 2,
             dropout_rate=dropout_rate,
         )
         self.entity_fc_layer = FCLayer(
             input_dim=config.hidden_size,
             output_dim=config.hidden_size,
-            hidden_dim=config.hidden_size // 2,
             dropout_rate=dropout_rate,
         )
         self.dim_reduction_fc_layer = FCLayer(
             input_dim=config.hidden_size * 3,
             output_dim=output_size,
-            hidden_dim=config.hidden_size,
             dropout_rate=dropout_rate,
         )
         self.label_classifier = FCLayer(
             input_dim=output_size,
             output_dim=config.num_labels,
-            hidden_dim=output_size // 2,
             dropout_rate=dropout_rate,
             use_activation=False,
         )

@@ -14,12 +14,12 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-from zeshrex import PROJECT_PATH, load_yaml_config, CONFIG_FILE_PATH, print_configs
-from zeshrex.data.datasets import SemEval2010Task8Dataset
+from zeshrex import PROJECT_PATH, CONFIG_FILE_PATH
+from zeshrex.data.datasets import RelationDataset
 from zeshrex.data.preprocessing import RelationTokenizationPreprocessor
 from zeshrex.evaluation import eval_model
 from zeshrex.model.relation_bert import RelationBert
-from zeshrex.utils.logger import init_logger
+from zeshrex.utils import init_logger, print_configs, load_yaml_config
 
 
 def run_pipeline():
@@ -30,23 +30,17 @@ def run_pipeline():
         tokenizer=tokenizer, max_len=config.data.max_len, relation_tokens=["<e1>", "</e1>", "<e2>", "</e2>"]
     )
 
-    train_dataset = SemEval2010Task8Dataset(
-        data_path=PROJECT_PATH / config.data.dataset_path / config.data.train_data_file_path,
-        text_processor=text_preprocessor,
-        relation_names_file_path=PROJECT_PATH / config.data.dataset_path / config.data.relations_file_path
+    dataset = RelationDataset.from_directory(
+        dir_path=PROJECT_PATH / config.data.dataset_path, text_processor=text_preprocessor
     )
+
+    train_dataset, test_dataset, val_dataset = dataset.generate_train_test_split()
+
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=config.train.batch_size,
         shuffle=True,
         collate_fn=train_dataset.collate_data,
-    )
-
-    test_data_file_path = PROJECT_PATH / config.data.dataset_path / config.data.test_data_file_path
-    test_dataset = SemEval2010Task8Dataset(
-        data_path=test_data_file_path,
-        text_processor=text_preprocessor,
-        relation_names_file_path=PROJECT_PATH / config.data.dataset_path / config.data.relations_file_path,
     )
     test_loader = DataLoader(
         dataset=test_dataset,
@@ -157,7 +151,7 @@ def run_pipeline():
                     logging.info('----------')
                     logging.info('Evaluation')
                     logging.info('----------')
-                    val_result = eval_model(model, device, test_loader)
+                    val_result = eval_model(model, device, test_loader, relations=dataset.relations_encoding)
                     logging.info('Global step {:^5} VAL res: {}'.format(global_step, val_result))
 
                     if val_result['eval_loss'] < best_eval_loss:

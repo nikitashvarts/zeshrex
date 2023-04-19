@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, Any
 
 import numpy as np
@@ -9,7 +10,7 @@ from torch.utils.data import DataLoader
 from zeshrex.model import Model
 
 
-def eval_model(model: Model, device: torch.device, dataloader: DataLoader) -> Dict[str, Any]:
+def eval_model(model: Model, device: torch.device, dataloader: DataLoader, relations: Dict[str, int]) -> Dict[str, Any]:
     model.eval()
     with torch.no_grad():
         metrics = {}
@@ -31,7 +32,7 @@ def eval_model(model: Model, device: torch.device, dataloader: DataLoader) -> Di
             true_labels = inputs['labels'].cpu().detach().numpy()
 
             precision, recall, f1_score, support = precision_recall_fscore_support(
-                y_true=true_labels, y_pred=pred_labels, labels=dataloader.dataset.labels, zero_division=0,
+                y_true=true_labels, y_pred=pred_labels, labels=list(relations.values()), zero_division=0,
             )
 
             metrics['precision'] = metrics.get('precision', []) + [precision]
@@ -39,9 +40,25 @@ def eval_model(model: Model, device: torch.device, dataloader: DataLoader) -> Di
             metrics['f1_score'] = metrics.get('f1_score', []) + [f1_score]
             metrics['loss'] = metrics.get('loss', []) + [float(loss)]
 
-        precision_macro = np.mean(np.mean(metrics['precision'], axis=0))
-        recall_macro = np.mean(np.mean(metrics['recall'], axis=0))
-        f1_score_macro = np.mean(np.mean(metrics['f1_score'], axis=0))
+        precision_batch_mean = np.mean(metrics['precision'], axis=0)
+        recall_batch_mean = np.mean(metrics['recall'], axis=0)
+        f1_score_batch_mean = np.mean(metrics['f1_score'], axis=0)
+
+        logging.info('| {:^30} | {:^11} | {:^10} | {:^10} |'.format('Relation', 'Precision', 'Recall', 'F1-score'))
+        for relation, p, r, f1 in zip(relations.keys(), precision_batch_mean, recall_batch_mean, f1_score_batch_mean):
+            logging.info('| {:^30} | {:^11.5f} | {:^10.5f} | {:^10.5f} |'.format(relation, p, r, f1))
+
+        sorted_index = np.argsort(f1_score_batch_mean)[::-1][:5]
+        logging.info(
+            'TOP-5 macro average: '
+            f'Precision: {np.mean(precision_batch_mean[sorted_index])} | '
+            f'Recall: {np.mean(recall_batch_mean[sorted_index])} | '
+            f'F1-score: {np.mean(f1_score_batch_mean[sorted_index])}'
+        )
+
+        precision_macro = np.mean(precision_batch_mean)
+        recall_macro = np.mean(recall_batch_mean)
+        f1_score_macro = np.mean(f1_score_batch_mean)
         avg_loss = np.mean(metrics['loss'])
 
         results = {

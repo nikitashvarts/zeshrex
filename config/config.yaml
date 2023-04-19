@@ -1,13 +1,13 @@
 gpu: 0
 seed: 42
 n_workers: 1
-models_output_dir: './models/'
-output_dir: './tmp/'
+models_output_dir: ./models/
+output_dir: ./tmp/
 log_frequency: 10
 
 train:
   batch_size: 64
-  num_epochs: 15
+  num_epochs: 30
   weight_decay: 0.1
   learning_rate: 2.0e-4  # The initial learning rate for Adam.
   warmup_steps: 500
@@ -18,12 +18,12 @@ train:
   eval_batch_size: 64
 
 model:
-  name: 'bert-large-cased'
+  name: bert-large-cased
   use_pretrain: ''
   output_size: 512
   dropout_rate: 0.25
   hidden_size: 512
-  hidden_act: 'gelu'
+  hidden_act: gelu
   initializer_range: 0.02
   vocab_size: 30522
   hidden_dropout_prob: 0.1
@@ -35,8 +35,5 @@ model:
   attention_probs_dropout_prob: 0.0
 
 data:
-  dataset_path: './datasets/SemEval2010_task8/'
-  relations_file_path: 'relation_names.txt'
-  train_data_file_path: 'TRAIN_FILE.TXT'
-  test_data_file_path: 'TEST_FILE_FULL.TXT'
+  dataset_path: ./datasets/prepared/WebNLG2019_version21/
   max_len: 200

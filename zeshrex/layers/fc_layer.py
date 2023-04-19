@@ -1,5 +1,6 @@
+from typing import Optional
+
 from torch import nn
-import torch.nn.functional as F
 
 
 class FCLayer(nn.Module):
@@ -7,23 +8,30 @@ class FCLayer(nn.Module):
             self,
             input_dim: int,
             output_dim: int,
-            hidden_dim: int = 256,
-            dropout_rate: float = 0.0,
-            use_activation: bool = True
+            hidden_dim: int = 0,
+            dropout_rate: float = 0.2,
+            use_activation: bool = True,
     ):
         super(FCLayer, self).__init__()
         self.use_activation = use_activation
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.dropout = nn.Dropout(dropout_rate)
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
         self.tanh = nn.Tanh()
-        self.relu = F.relu
+
+        fc1_output = hidden_dim if hidden_dim != 0 else output_dim
+        self.fc1: nn.Linear = nn.Linear(input_dim, fc1_output)
+        self.fc2: Optional[nn.Linear] = nn.Linear(hidden_dim, output_dim) if hidden_dim != 0 else None
 
     def forward(self, x):
-        out = self.fc1(x)
+        out = x
+        if self.fc2 is not None:
+            out = self.fc1(out)
+
         if self.use_activation:
             out = self.tanh(out)
-            # out = self.relu(out)
         out = self.dropout(out)
-        out = self.fc2(out)
+
+        if self.fc2 is not None:
+            out = self.fc2(out)
+        else:
+            out = self.fc1(out)
         return out

@@ -4,7 +4,7 @@ from typing import Union, Callable
 
 import yaml
 
-from zeshrex.utils import convert_dict_to_namespace
+from zeshrex.utils.misc import convert_dict_to_namespace
 
 
 def load_yaml_config(path: Union[Path, str], convert_to_namespace: bool = False) -> Union[dict, SimpleNamespace]:
