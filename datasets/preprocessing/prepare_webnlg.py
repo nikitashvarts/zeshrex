@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+import random
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional
 
@@ -64,10 +65,10 @@ def load_data(
     current_index = initial_index
     for entry in b.entries:
         for triplet in entry.modifiedtripleset.triples:
-            sub, pred, obj = triplet.s, triplet.p, triplet.o
+            sub_text, pred, obj_text = triplet.s, triplet.p, triplet.o
 
-            sub = sub.replace('_', ' ').strip('\"').strip("\'")
-            obj = obj.replace('_', ' ').strip('\"').strip("\'")
+            sub_text = sub_text.replace('_', ' ').strip('\"').strip("\'")
+            obj_text = obj_text.replace('_', ' ').strip('\"').strip("\'")
 
             relations = [relation for alias, relation in relation_aliases.items() if pred == alias]
             for single_relation in relations:
@@ -79,22 +80,28 @@ def load_data(
                 for lex in entry.lexs:
                     raw_text = lex.lex
                     try:
-                        sub_begin = raw_text.index(sub)
-                        obj_begin = raw_text.index(obj)
+                        sub_begin_idx = raw_text.index(sub_text)
+                        obj_begin_idx = raw_text.index(obj_text)
                     except ValueError:
                         continue
-                    if sub_begin <= obj_begin:
-                        first, second = sub, obj
-                        first_beg, second_beg = sub_begin, obj_begin
-                    else:
-                        first, second = obj, sub
-                        first_beg, second_beg = obj_begin, sub_begin
 
-                    text = raw_text[:first_beg]
-                    text += '<e1>' + raw_text[first_beg : (first_beg + len(first))] + '</e1>'
-                    text += raw_text[(first_beg + len(first)) : second_beg]
-                    text += '<e2>' + raw_text[second_beg : (second_beg + len(second))] + '</e2>'
-                    text += raw_text[(second_beg + len(second)) :]
+                    if sub_begin_idx <= obj_begin_idx:
+                        first_text, second_text = sub_text, obj_text
+                        first_beg_idx, second_beg_idx = sub_begin_idx, obj_begin_idx
+                        first_beg_token, first_end_token = '<e1>', '</e1>'
+                        second_beg_token, second_end_token = '<e2>', '</e2>'
+                    else:
+                        first_text, second_text = obj_text, sub_text
+                        first_beg_idx, second_beg_idx = obj_begin_idx, sub_begin_idx
+                        first_beg_token, first_end_token = '<e2>', '</e2>'
+                        second_beg_token, second_end_token = '<e1>', '</e1>'
+
+                    text = raw_text[:first_beg_idx]
+                    text += first_beg_token + raw_text[first_beg_idx : (first_beg_idx + len(first_text))] + first_end_token
+                    text += raw_text[(first_beg_idx + len(first_text)) : second_beg_idx]
+                    text += second_beg_token + raw_text[second_beg_idx : (second_beg_idx + len(second_text))] + second_end_token
+                    text += raw_text[(second_beg_idx + len(second_text)) :]
+
                     sample = {
                         'index': current_index,
                         'relation': single_relation,
@@ -118,6 +125,9 @@ def main(args: Dict[str, Any]) -> None:
 
     relation_names_file_path = dataset_path / args['relation_names_file']
     relation_names = load_relation_names(relation_names_file_path)
+
+    train_relation_names = random.sample(relation_names, int(len(relation_names) * 0.7))
+    test_relation_names = [rel for rel in relation_names if rel not in train_relation_names]
 
     relation_aliases_file_path = dataset_path / args['relation_aliases_file']
     relation_aliases = load_relation_aliases(relation_aliases_file_path)

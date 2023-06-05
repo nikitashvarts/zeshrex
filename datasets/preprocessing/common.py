@@ -1,6 +1,7 @@
 import csv
 import logging
 import os
+import unicodedata
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -36,3 +37,7 @@ def save_index(index: List[int], dir_path: os.PathLike, name: str) -> None:
 
     with open(file_path, 'w') as txt_file:
         txt_file.writelines([f'{i}\n' for i in index])
+
+
+def strip_accents(s):
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
