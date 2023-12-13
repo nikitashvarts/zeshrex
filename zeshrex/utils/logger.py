@@ -1,4 +1,6 @@
 import logging
+import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -28,7 +30,9 @@ def init_logger(
     logger.addHandler(console_handler)
 
     if file_name:
-        file_path = Path(PROJECT_PATH) / 'logs' / file_name
+        dt_prefix = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        random_prefix = uuid.uuid4().hex[:6]
+        file_path = Path(PROJECT_PATH) / 'logs' / f'{dt_prefix}_{random_prefix}_{file_name}'
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         file_handler = logging.FileHandler(file_path)

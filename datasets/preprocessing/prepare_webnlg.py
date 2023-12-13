@@ -15,13 +15,13 @@ from zeshrex.utils import init_logger, print_configs
 def load_args() -> Dict[str, Any]:
     parser = argparse.ArgumentParser('Script for SemEval2010 Task 8 dataset preparation')
 
-    parser.add_argument('--data_dir', type=str, default='./datasets/raw/WebNLG2019_version21/')
+    parser.add_argument('--data_dir', type=str, default='./datasets/raw/WebNLG/')
     parser.add_argument('--train_data', type=str, default='./xml/train/')
     parser.add_argument('--test_data', type=str, default='./xml/test/')
     parser.add_argument('--dev_data', type=str, default='./xml/dev/')
-    parser.add_argument('--relation_names_file', type=str, default='relation_names.txt')
+    parser.add_argument('--relation_names_file', type=str, default='relation_names_top.txt')
     parser.add_argument('--relation_aliases_file', type=str, default='relation_aliases.json')
-    parser.add_argument('--output_dir', type=str, default='./datasets/prepared/WebNLG2019_version21/')
+    parser.add_argument('--output_dir', type=str, default='./datasets/prepared/WebNLG/')
 
     return parser.parse_args().__dict__
 
@@ -39,8 +39,10 @@ def load_data(
     relation_aliases: Optional[Dict[str, str]] = None,
     initial_index: int = 1,
 ) -> Tuple[List[Dict[str, Any]], List[int]]:
+    data_path = Path(data_path)
+
     logging.info(f'Loading dataset from {data_path}')
-    assert Path(data_path).exists(), f'Data file not found! {data_path}'
+    assert data_path.exists(), f'Data file not found! {data_path}'
 
     if relation_names:
         logging.info(f'Loading data with the following relations: {relation_names}')
@@ -123,8 +125,8 @@ def main(args: Dict[str, Any]) -> None:
     dataset_path = PROJECT_PATH / args['data_dir']
     output_path = PROJECT_PATH / args['output_dir']
 
-    relation_names_file_path = dataset_path / args['relation_names_file']
-    relation_names = load_relation_names(relation_names_file_path)
+    relation_names_file_path = (dataset_path / args['relation_names_file']) if args['relation_names_file'] else None
+    relation_names = load_relation_names(relation_names_file_path) if relation_names_file_path else None
 
     train_relation_names = random.sample(relation_names, int(len(relation_names) * 0.7))
     test_relation_names = [rel for rel in relation_names if rel not in train_relation_names]

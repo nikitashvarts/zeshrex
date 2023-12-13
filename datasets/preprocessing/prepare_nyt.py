@@ -1,10 +1,11 @@
 import argparse
 import json
 import logging
+import os
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional
 
-from datasets.preprocessing.common import save_data, save_index, strip_accents
+from datasets.preprocessing.common import save_data, save_index, strip_accents, load_relation_names
 from zeshrex import PROJECT_PATH
 from zeshrex.utils import init_logger, print_configs
 
@@ -16,16 +17,18 @@ def load_args() -> Dict[str, Any]:
     parser.add_argument('--train_file', type=str, default='./train.json')
     parser.add_argument('--test_file', type=str, default='./test.json')
     parser.add_argument('--val_file', type=str, default='./valid.json')
+    parser.add_argument('--relation_names_file', type=str, default='./relation_names_top.txt')
     parser.add_argument('--output_dir', type=str, default='./datasets/prepared/NYT/')
 
     return parser.parse_args().__dict__
 
 
 def load_data(
-    file_path: Path,
+    file_path: os.PathLike,
     relation_names: Optional[List[str]] = None,
     initial_index: int = 1,
 ) -> Tuple[List[Dict[str, Any]], List[int]]:
+    file_path = Path(file_path)
     assert file_path.suffix == '.json', 'Data file must be a JSON file for NYT dataset'
     raw_data: List[Dict[str, Any]] = [json.loads(line) for line in open(file_path, 'r')]
 
@@ -45,7 +48,7 @@ def load_data(
         raw_text: str = sample_data['sentText']
 
         for single_relation_data in sample_data['relationMentions']:
-            relation = single_relation_data['label']
+            relation = single_relation_data['label'].rsplit('/', 1)[-1]
             if relation_names is not None and relation not in relation_names_set:
                 logging.debug(f'Skipping relation {relation} as it is not stated in relation names!')
                 continue
@@ -97,13 +100,16 @@ def main(args: Dict[str, Any]) -> None:
     dataset_path = PROJECT_PATH / args['data_dir']
     output_path = PROJECT_PATH / args['output_dir']
 
+    relation_names_file_path = (dataset_path / args['relation_names_file']) if args['relation_names_file'] else None
+    relation_names = load_relation_names(relation_names_file_path) if relation_names_file_path else None
+
     train_data_path = dataset_path / args['train_file']
     test_data_path = dataset_path / args['test_file']
     val_data_path = dataset_path / args['val_file']
 
-    train_data, train_index = load_data(train_data_path)
-    test_data, test_index = load_data(test_data_path, initial_index=max(train_index) + 1)
-    val_data, val_index = load_data(val_data_path, initial_index=max(test_index) + 1)
+    train_data, train_index = load_data(train_data_path, relation_names)
+    test_data, test_index = load_data(test_data_path, relation_names, initial_index=max(train_index) + 1)
+    val_data, val_index = load_data(val_data_path, relation_names, initial_index=max(test_index) + 1)
 
     joined_data = [*train_data, *test_data, *val_data]
 

@@ -16,6 +16,7 @@ class FCLayer(nn.Module):
         self.use_activation = use_activation
         self.dropout = nn.Dropout(dropout_rate)
         self.tanh = nn.Tanh()
+        self.relu = nn.ReLU()
 
         fc1_output = hidden_dim if hidden_dim != 0 else output_dim
         self.fc1: nn.Linear = nn.Linear(input_dim, fc1_output)
@@ -26,12 +27,15 @@ class FCLayer(nn.Module):
         if self.fc2 is not None:
             out = self.fc1(out)
 
-        if self.use_activation:
-            out = self.tanh(out)
         out = self.dropout(out)
 
         if self.fc2 is not None:
             out = self.fc2(out)
         else:
             out = self.fc1(out)
+
+        if self.use_activation:
+            # out = self.tanh(out)
+            out = self.relu(out)
+
         return out

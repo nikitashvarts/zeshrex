@@ -6,11 +6,20 @@ from zeshrex.layers import FCLayer
 
 
 class RelationBert(BertPreTrainedModel):
-    def __init__(self, config: BertConfig, output_size: int, dropout_rate: float):
+    def __init__(
+        self,
+        config: BertConfig,
+        output_size: int,
+        dropout_rate: float,
+        alpha: float = 0.4,
+        gamma: float = 7.5
+    ):
         super().__init__(config)
         self.bert = BertModel(config=config)  # Load pretrained bert
 
         self.num_labels = config.num_labels
+        self._alpha = alpha
+        self._gamma = gamma
 
         self.cls_fc_layer = FCLayer(
             input_dim=config.hidden_size,
@@ -30,16 +39,83 @@ class RelationBert(BertPreTrainedModel):
         self.label_classifier = FCLayer(
             input_dim=output_size,
             output_dim=config.num_labels,
+            hidden_dim=output_size // 2,
             dropout_rate=dropout_rate,
-            use_activation=False,
+            use_activation=True,
         )
 
-    def forward(self, input_ids, attention_masks, token_type_ids, e1_masks, e2_masks, labels):
+    def forward(
+            self,
+            # input_ids, attention_masks, token_type_ids, e1_masks, e2_masks, labels
+            anchor_input_ids, anchor_attention_masks, anchor_token_type_ids, anchor_e1_masks, anchor_e2_masks,
+            pos_input_ids, pos_attention_masks, #pos_token_type_ids, pos_e1_masks, pos_e2_masks,
+            neg_input_ids, neg_attention_masks, neg_token_type_ids, neg_e1_masks, neg_e2_masks,
+            labels=None
+    ):
+        # TODO: make options, classification or triplet loss
+
+        # -------------------------------------------------------------------
+        anchor_embeddings = self._get_relation_embedding(
+            anchor_input_ids, anchor_attention_masks, anchor_token_type_ids, anchor_e1_masks, anchor_e2_masks
+        )
+        positive_embeddings = self._get_relation_embedding(
+            pos_input_ids, pos_attention_masks, None, None, None #pos_token_type_ids, pos_e1_masks, pos_e2_masks,
+        )
+        negative_embeddings = self._get_relation_embedding(
+            neg_input_ids, neg_attention_masks, neg_token_type_ids, neg_e1_masks, neg_e2_masks,
+        )
+
+        distance_pos = torch.nn.functional.pairwise_distance(anchor_embeddings, positive_embeddings)
+        distance_neg = torch.nn.functional.pairwise_distance(anchor_embeddings, negative_embeddings)
+
+        triplet_loss = torch.nn.functional.relu(distance_pos - distance_neg + self._gamma).mean()  # TODO: max(0, loss)
+        # -------------------------------------------------------------------
+        if labels is not None:
+            logits = self.label_classifier(anchor_embeddings)
+            if self.num_labels == 1:
+                loss_fct = nn.MSELoss()
+                softmax_loss = loss_fct(logits.view(-1), labels.view(-1))
+            else:
+                loss_fct = nn.CrossEntropyLoss()
+                softmax_loss = loss_fct(logits, labels)
+        else:
+            softmax_loss = 0
+        # -------------------------------------------------------------------
+
+        loss = (1 - self._alpha) * triplet_loss + self._alpha * softmax_loss  # TODO: plus or minus softmax?
+
+        return loss, anchor_embeddings
+
+        # reduced_concat_h = self._get_relation_embedding(
+        #     input_ids, attention_masks, token_type_ids, e1_masks, e2_masks
+        # )
+        # logits = self.label_classifier(reduced_concat_h)
+        #
+        # outputs = (logits,)  # + outputs[2:]  # add hidden states and attention if they are here  # TODO: is it needed?
+        #
+        # # Softmax
+        # if labels is not None:
+        #     if self.num_labels == 1:
+        #         loss_fct = nn.MSELoss()
+        #         loss = loss_fct(logits.view(-1), labels.view(-1))
+        #     else:
+        #         loss_fct = nn.CrossEntropyLoss()
+        #         loss = loss_fct(logits, labels)
+        #
+        #     outputs = (loss,) + outputs
+        #
+        # return loss, reduced_concat_h
+
+    def _get_relation_embedding(self, input_ids, attention_masks, token_type_ids, e1_masks, e2_masks):
         outputs = self.bert(
             input_ids, attention_mask=attention_masks, token_type_ids=token_type_ids
         )  # sequence_output, pooled_output, (hidden_states), (attentions)
         sequence_output = outputs[0]
         pooled_output = outputs[1]  # [CLS]
+
+        if token_type_ids is None and e1_masks is None and e2_masks is None:
+            pooled_output = self.cls_fc_layer(pooled_output)
+            return pooled_output
 
         # Average
         e1_h = self._entity_average(sequence_output, e1_masks)
@@ -53,22 +129,9 @@ class RelationBert(BertPreTrainedModel):
         # Concat -> fc_layer -> classifier_fc_layer
         concat_h = torch.cat([pooled_output, e1_h, e2_h], dim=-1)
         reduced_concat_h = self.dim_reduction_fc_layer(concat_h)
-        logits = self.label_classifier(reduced_concat_h)
 
-        outputs = (logits,) + outputs[2:]  # add hidden states and attention if they are here
-
-        # Softmax
-        if labels is not None:
-            if self.num_labels == 1:
-                loss_fct = nn.MSELoss()
-                loss = loss_fct(logits.view(-1), labels.view(-1))
-            else:
-                loss_fct = nn.CrossEntropyLoss()
-                loss = loss_fct(logits, labels)
-
-            outputs = (loss,) + outputs
-
-        return outputs, reduced_concat_h  # (loss), logits, (hidden_states), (attentions)
+        return reduced_concat_h
+        # return pooled_output
 
     @staticmethod
     def _entity_average(hidden_output, e_mask):

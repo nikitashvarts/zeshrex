@@ -6,8 +6,8 @@ output_dir: ./tmp/
 log_frequency: 10
 
 train:
-  batch_size: 64
-  num_epochs: 30
+  batch_size: 16
+  num_epochs: 15
   weight_decay: 0.1
   learning_rate: 2.0e-4  # The initial learning rate for Adam.
   warmup_steps: 500
@@ -18,6 +18,7 @@ train:
   eval_batch_size: 64
 
 model:
+#  name: DeepPavlov/rubert-base-cased
   name: bert-large-cased
   use_pretrain: ''
   output_size: 512
@@ -35,5 +36,7 @@ model:
   attention_probs_dropout_prob: 0.0
 
 data:
-  dataset_path: ./datasets/prepared/WebNLG2019_version21/
+  dataset_path: ./datasets/prepared/WebNLG/
   max_len: 200
+  use_predefined_split: True
+  use_zero_shot_split: False

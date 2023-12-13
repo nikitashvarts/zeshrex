@@ -66,7 +66,7 @@ class RelationTokenizationPreprocessor(BasePreprocessor):
     def __call__(self, text: str):
         tokens: List[str] = self.tokenizer.tokenize(text)
 
-        e11_p = tokens.index('<e1>')  # the start position of entity1
+        e11_p = tokens.index('<e1>')  # the start position of entity1  # TODO: get these tokens from init args
         e12_p = tokens.index('</e1>')  # the end position of entity1
         e21_p = tokens.index('<e2>')  # the start position of entity2
         e22_p = tokens.index('</e2>')  # the end position of entity2

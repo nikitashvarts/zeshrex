@@ -11,11 +11,11 @@ from zeshrex.utils import init_logger, print_configs
 def load_args() -> Dict[str, Any]:
     parser = argparse.ArgumentParser('Script for SemEval2010 Task 8 dataset preparation')
 
-    parser.add_argument('--data_dir', type=str, default='./datasets/raw/SemEval2010_task8/')
+    parser.add_argument('--data_dir', type=str, default='./datasets/raw/SemEval/')
     parser.add_argument('--train_file', type=str, default='TRAIN_FILE.TXT')
     parser.add_argument('--test_file', type=str, default='TEST_FILE_FULL.TXT')
     parser.add_argument('--relation_names_file', type=str, default='relation_names.txt')
-    parser.add_argument('--output_dir', type=str, default='./datasets/prepared/SemEval2010_task8/')
+    parser.add_argument('--output_dir', type=str, default='./datasets/prepared/SemEval/')
 
     return parser.parse_args().__dict__
 

@@ -6,11 +6,14 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 
-def load_relation_names(file_path: os.PathLike) -> List[str]:
+def load_relation_names(file_path: os.PathLike) -> Dict[str, str]:
     logging.info(f'Taking relation names from {file_path}')
+    relations: Dict[str, str] = {}
     with open(file_path, 'r') as f:
-        relation_names = [line.strip() for line in f.readlines()]
-    return relation_names
+        for line in f.readlines():
+            relation, description = line.strip().split('\t')
+            relations[relation] = description
+    return relations
 
 
 def save_data(data: List[Dict[str, Any]], dir_path: os.PathLike) -> None:

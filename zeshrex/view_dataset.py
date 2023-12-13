@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 from collections import Counter
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict, Optional
 
@@ -27,12 +28,16 @@ def view_dataset(cfg: SimpleNamespace, output_dir: Optional[os.PathLike] = None)
     assert len(relations_decoding_map) == len(dataset.relations_encoding), 'Dataset contains duplicated labels!'
 
     relations_count = dict(Counter([relations_decoding_map[label] for _, label in dataset]))
-    relations_count = {k: v for k, v in sorted(relations_count.items(), key=lambda item: item[1], reverse=True)}
+    relations_count = {k: v for k, v in sorted(relations_count.items(), key=lambda item: item[1], reverse=False)}
 
-    fig, ax = plt.subplots(figsize=(20, 10))
-    bars = ax.bar(range(len(relations_count)), list(relations_count.values()), align='center')
-    ax.bar_label(bars)
-    ax.set_xticks(range(len(relations_count)), list(relations_count.keys()), rotation='vertical')
+    fig, ax = plt.subplots(figsize=(15, 7))
+    # fig.subplots_adjust(left=0.15)
+    ax.barh(range(len(relations_count)), list(relations_count.values()), align='center')
+    ax.set_yticks(range(len(relations_count)), list(relations_count.keys()))
+    ax.set_xlabel('Number of samples')
+    ax.set_title(f'{Path(cfg.dataset_path).stem}')
+    # ax.bar_label(bars)
+    # ax.set_xticks(range(len(relations_count)), list(relations_count.keys()), rotation='vertical')
 
     if output_dir:
         output_dir = PROJECT_PATH / output_dir
