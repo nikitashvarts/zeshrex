@@ -128,19 +128,19 @@ def eval_zero_shot_model(
                 'anchor_e2_masks': batch[4],
                 'pos_input_ids': batch[5],
                 'pos_attention_masks': batch[6],
-                # 'pos_token_type_ids': batch[7],
-                # 'pos_e1_masks': batch[8],
-                # 'pos_e2_masks': batch[9],
-                'neg_input_ids': batch[-6],
-                'neg_attention_masks': batch[-5],
-                'neg_token_type_ids': batch[-4],
-                'neg_e1_masks': batch[-3],
-                'neg_e2_masks': batch[-2],
-                'labels': None,
+                'pos_token_type_ids': batch[7],
+                'pos_e1_masks': batch[8],
+                'pos_e2_masks': batch[9],
+                'neg_input_ids': batch[10],
+                'neg_attention_masks': batch[11],
+                'neg_token_type_ids': batch[12],
+                'neg_e1_masks': batch[13],
+                'neg_e2_masks': batch[14],
+                'labels': batch[15],
+                'desc_input_ids': batch[16],
+                'desc_attention_masks': batch[17],
             }
-            labels = batch[-1]
-
-
+            labels = batch[15]
 
             loss, embeddings_batch = model(**inputs)
 

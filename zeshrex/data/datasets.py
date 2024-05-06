@@ -129,21 +129,21 @@ class RelationDataset(Dataset):
                 relations,
                 (self._train_index, None, None),
                 self._text_processor,
-                # limit=100,  # TODO: remove debug
+                # limit=1000,  # TODO: remove debug
             ),
             RelationDataset(
                 split_data.get('test', []),
                 relations,
                 (None, self._test_index, None),
                 self._text_processor,
-                # limit=30,  # TODO: remove debug
+                # limit=300,  # TODO: remove debug
             ),
             RelationDataset(
                 split_data.get('val', []),
                 relations,
                 (None, None, self._val_index),
                 self._text_processor,
-                # limit=30,  # TODO: remove debug
+                # limit=300,  # TODO: remove debug
             ),
         )
 
@@ -260,15 +260,15 @@ class TripletsRelationDataset(Dataset):
     def __len__(self):
         return len(self._dataset)
 
-    def __getitem__(self, index: int) -> Tuple[Tuple[Any, Any, Any], int]:
+    def __getitem__(self, index: int) -> Tuple[Tuple[Any, Any, Any], int, Any]:
         return self._dataset[index]
 
     def _make_positive_negative_triplets(
             self,
             data: RelationDataset,
-    ) -> List[Tuple[Tuple[Any, Any, Any], int]]:
+    ) -> List[Tuple[Tuple[Any, Any, Any], int, Any]]:
         logging.info('Making positive and negative triplets from data')
-        triplets: List[Tuple[Tuple[Any, Any, Any], int]] = []
+        triplets: List[Tuple[Tuple[Any, Any, Any], int, Any]] = []
         pbar = tqdm(total=len(data), miniters=1)
         for anchor_sample, anchor_relation in data:
 
@@ -278,15 +278,17 @@ class TripletsRelationDataset(Dataset):
             # -------------------------------------------------------
 
             for i in range(self._triplets_per_sample):
-                # while True:
-                #     positive_sample, positive_relation = random.choice(data)
-                #     if positive_relation == anchor_relation:
-                #         break
+                while True:
+                    positive_sample, positive_relation = random.choice(data)
+                    if positive_sample == anchor_sample:
+                        continue
+                    if positive_relation == anchor_relation:
+                        break
                 while True:
                     negative_sample, negative_relation = random.choice(data)
                     if negative_relation != anchor_relation:
                         break
-                triplets.append(((*anchor_sample, *desc_sample, *negative_sample), anchor_relation))
+                triplets.append(((*anchor_sample, *positive_sample, *negative_sample), anchor_relation, desc_sample))
             pbar.update(1)
         pbar.close()
 
@@ -302,10 +304,33 @@ def collate_data(batch: List[Tuple[Tuple[Iterable, ...], int]]) -> List[torch.Te
             collated_data[index] = collated_data.get(index, []) + [list(item)]
         collated_labels.append(label)
 
-    collated_tensors: List[torch.Tensor, ...] = []
+    collated_tensors: List[torch.Tensor] = []
     for collated_items in collated_data.values():
         collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
 
     collated_tensors.append(torch.tensor(collated_labels, dtype=torch.long))
+
+    return collated_tensors
+
+
+def collate_data_triplets(batch: List[Tuple[Tuple[Iterable, ...], int]]) -> List[torch.Tensor]:
+    collated_data: Dict[int, List[List[Any]]] = {}
+    collated_labels: List[int] = []
+    collated_desc: Dict[int, Any] = {}
+    for data, label, desc in batch:
+        for index, item in enumerate(data):
+            collated_data[index] = collated_data.get(index, []) + [list(item)]
+        collated_labels.append(label)
+        for index, item in enumerate(desc):
+            collated_desc[index] = collated_desc.get(index, []) + [list(item)]
+
+    collated_tensors: List[torch.Tensor] = []
+    for collated_items in collated_data.values():
+        collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
+
+    collated_tensors.append(torch.tensor(collated_labels, dtype=torch.long))
+
+    for collated_items in collated_desc.values():
+        collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
 
     return collated_tensors

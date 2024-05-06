@@ -5,7 +5,7 @@ from transformers import BertConfig, BertModel, BertPreTrainedModel
 from zeshrex.layers import FCLayer
 
 
-class RelationBert(BertPreTrainedModel):
+class RelationBert(nn.Module):
     def __init__(
         self,
         config: BertConfig,
@@ -14,8 +14,9 @@ class RelationBert(BertPreTrainedModel):
         alpha: float = 0.4,
         gamma: float = 7.5
     ):
-        super().__init__(config)
-        self.bert = BertModel(config=config)  # Load pretrained bert
+        super().__init__()
+        self._bert_sample = BertModel(config=config)  # Load pretrained bert
+        self._bert_relation = BertModel(config=config)
 
         self.num_labels = config.num_labels
         self._alpha = alpha
@@ -48,9 +49,10 @@ class RelationBert(BertPreTrainedModel):
             self,
             # input_ids, attention_masks, token_type_ids, e1_masks, e2_masks, labels
             anchor_input_ids, anchor_attention_masks, anchor_token_type_ids, anchor_e1_masks, anchor_e2_masks,
-            pos_input_ids, pos_attention_masks, #pos_token_type_ids, pos_e1_masks, pos_e2_masks,
+            pos_input_ids, pos_attention_masks, pos_token_type_ids, pos_e1_masks, pos_e2_masks,
             neg_input_ids, neg_attention_masks, neg_token_type_ids, neg_e1_masks, neg_e2_masks,
-            labels=None
+            desc_input_ids, desc_attention_masks,
+            labels=None,
     ):
         # TODO: make options, classification or triplet loss
 
@@ -59,16 +61,21 @@ class RelationBert(BertPreTrainedModel):
             anchor_input_ids, anchor_attention_masks, anchor_token_type_ids, anchor_e1_masks, anchor_e2_masks
         )
         positive_embeddings = self._get_relation_embedding(
-            pos_input_ids, pos_attention_masks, None, None, None #pos_token_type_ids, pos_e1_masks, pos_e2_masks,
+            pos_input_ids, pos_attention_masks, pos_token_type_ids, pos_e1_masks, pos_e2_masks,
         )
         negative_embeddings = self._get_relation_embedding(
             neg_input_ids, neg_attention_masks, neg_token_type_ids, neg_e1_masks, neg_e2_masks,
         )
 
+        # relation_desc_embedding = self._bert_relation(desc_input_ids, desc_attention_masks)[1]
+
         distance_pos = torch.nn.functional.pairwise_distance(anchor_embeddings, positive_embeddings)
         distance_neg = torch.nn.functional.pairwise_distance(anchor_embeddings, negative_embeddings)
 
-        triplet_loss = torch.nn.functional.relu(distance_pos - distance_neg + self._gamma).mean()  # TODO: max(0, loss)
+        triplet_loss = torch.nn.functional.relu(distance_pos - distance_neg + self._gamma).mean()
+
+        # desc_loss = torch.nn.functional.pairwise_distance(anchor_embeddings, relation_desc_embedding).mean()
+
         # -------------------------------------------------------------------
         if labels is not None:
             logits = self.label_classifier(anchor_embeddings)
@@ -82,7 +89,8 @@ class RelationBert(BertPreTrainedModel):
             softmax_loss = 0
         # -------------------------------------------------------------------
 
-        loss = (1 - self._alpha) * triplet_loss + self._alpha * softmax_loss  # TODO: plus or minus softmax?
+        # loss = (1 - self._alpha) * (triplet_loss + desc_loss) + self._alpha * softmax_loss  # TODO: plus or minus softmax?
+        loss = (1 - self._alpha) * (triplet_loss) + self._alpha * softmax_loss  # TODO: plus or minus softmax?
 
         return loss, anchor_embeddings
 
@@ -107,15 +115,15 @@ class RelationBert(BertPreTrainedModel):
         # return loss, reduced_concat_h
 
     def _get_relation_embedding(self, input_ids, attention_masks, token_type_ids, e1_masks, e2_masks):
-        outputs = self.bert(
+        outputs = self._bert_sample(
             input_ids, attention_mask=attention_masks, token_type_ids=token_type_ids
         )  # sequence_output, pooled_output, (hidden_states), (attentions)
         sequence_output = outputs[0]
         pooled_output = outputs[1]  # [CLS]
 
-        if token_type_ids is None and e1_masks is None and e2_masks is None:
-            pooled_output = self.cls_fc_layer(pooled_output)
-            return pooled_output
+        # if token_type_ids is None and e1_masks is None and e2_masks is None:
+        #     pooled_output = self.cls_fc_layer(pooled_output)
+        #     return pooled_output
 
         # Average
         e1_h = self._entity_average(sequence_output, e1_masks)

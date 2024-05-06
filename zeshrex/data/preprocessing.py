@@ -86,10 +86,10 @@ class RelationTokenizationPreprocessor(BasePreprocessor):
         special_tokens_count = 1
         max_len = self.max_len - special_tokens_count
 
-        assert e12_p < max_len and e22_p < max_len, 'Index of special token is grater than max lenght!'
+        assert e12_p < max_len and e22_p < max_len, 'Index of special token is grater than max length!'
 
         if len(tokens) > max_len:
-            tokens = tokens[:(max_len)]
+            tokens = tokens[:max_len]
 
         token_type_ids = [self.sequence_a_segment_id] * len(tokens)
 
