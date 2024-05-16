@@ -96,7 +96,7 @@ def eval_model(model, device, test_dataloader, criterion):
 
     for step, batch in enumerate(test_dataloader):
         if step % 50 == 0 and not step == 0:
-            print('  Batch {:>5,}  of  {:>5,}.'.format(step, len(test_dataloader)))
+            logging.info('Batch {:>5,} of {:>5,}'.format(step, len(test_dataloader)))
 
         batch = tuple(t.to(device) for t in batch)
 
@@ -162,13 +162,22 @@ def run_baseline():
 
     model.to(device)
 
+    global_steps_count = 0
+    steps_per_epoch = len(train_loader)
+
     # Training loop
+    # -------------
     for epoch in range(num_epochs):
         logging.info('========')
-        logging.info(f'EPOCH {epoch}')
+        logging.info(f'EPOCH {epoch + 1}')
         logging.info('========')
 
-        for step, batch in enumerate(train_loader):
+        running_loss = 0.0
+        steps_count = 0
+        for batch in train_loader:
+            global_steps_count += 1
+            steps_count += 1
+
             model.train()
 
             batch = tuple(t.to(device) for t in batch)
@@ -185,21 +194,36 @@ def run_baseline():
 
             outputs = model(**inputs)
             loss = criterion(outputs, labels)
-            logging.info(f'Step {step} / {len(train_loader)}, Loss: {loss.item()}')
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            
+            running_loss += loss.item()
+            if steps_count % 50 == 0:
+                logging.info(
+                    'Epoch {:^3} Step {:^5} --- '
+                    'Average loss (over {:^5} training steps out of {}): {:.5f}'.format(
+                        epoch + 1,
+                        global_steps_count,
+                        steps_count,
+                        steps_per_epoch,
+                        running_loss / steps_count,
+                    )
+                )
+
+        # Print loss after every epoch
+        logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {running_loss / len(train_loader):.4f}")
 
         # Calculate metrics on the validation set
-        avg_loss, precision, recall, f1 = eval_model(model, test_loader, criterion)
+        avg_loss, precision, recall, f1 = eval_model(model, device, test_loader, criterion)
         logging.info(f'Validation Loss: {avg_loss}, Precision: {precision}, Recall: {recall}, F1-score: {f1}')
 
 
 if __name__ == "__main__":
     init_logger(file_name='run_pipeline.log', level=logging.INFO)
 
-    gpu = 0
+    gpu = 1
 
     model_name = 'bert-base-cased'
     max_len = 200
@@ -207,9 +231,9 @@ if __name__ == "__main__":
     use_predefined_split = True
     use_zero_shot_split = False
 
-    batch_size = 16
-    eval_batch_size = 32
-    num_epochs = 100
+    batch_size = 110
+    eval_batch_size = 110
+    num_epochs = 10
 
     hidden_size = 768
     output_size = 768

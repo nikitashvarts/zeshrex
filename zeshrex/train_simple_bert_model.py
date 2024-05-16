@@ -47,10 +47,10 @@ def main():
     hidden_size = 256
     learning_rate = 0.0002
     num_epochs = 10
-    batch_size = 4
+    batch_size = 110
     max_len = 200
 
-    model_name = 'bert-large-cased'
+    model_name = 'bert-base-cased'
     dataset_path = PROJECT_PATH / './datasets/prepared/WebNLG/'
 
     tokenizer = BertTokenizer.from_pretrained(pretrained_model_name_or_path=model_name)
@@ -94,7 +94,9 @@ def main():
         logging.info('========')
         logging.info(f'EPOCH {epoch + 1}')
         logging.info('========')
+        
         model.train()
+        
         running_loss = 0.0
         steps_count = 0
         for i, data in enumerate(train_loader):
