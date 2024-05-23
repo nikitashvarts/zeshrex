@@ -111,6 +111,8 @@ def eval_model(model, device, test_dataloader, criterion):
     total_preds = []
     total_labels = []
 
+    softmax = torch.nn.Softmax(dim=1)
+
     for step, batch in enumerate(test_dataloader):
         if step % 10 == 0 and not step == 0:
             logging.info('Evaluation: Batch {:>5,} of {:>5,}'.format(step, len(test_dataloader)))
@@ -130,12 +132,13 @@ def eval_model(model, device, test_dataloader, criterion):
         with torch.no_grad():
             outputs, _ = model(**inputs)
 
-        loss = criterion(outputs[0], labels)
-        total_loss += loss.item()
+            loss = criterion(outputs[0], labels)
+            total_loss += loss.item()
 
-        preds = torch.argmax(outputs[0], dim=1).flatten()
-        total_preds.extend(preds.cpu().numpy())
-        total_labels.extend(labels.cpu().numpy())
+            probs = softmax(outputs[0])
+            preds = torch.argmax(probs, dim=1)
+            total_preds.extend(preds.cpu().numpy())
+            total_labels.extend(labels.cpu().numpy())
 
     print(set(total_preds), set(total_labels))
 
@@ -275,23 +278,23 @@ if __name__ == "__main__":
     output_size = 768
     dropout_rate = 0.1  # 0.25
 
-    model_config = {
-        'name': 'bert-base-cased',
-        'use_pretrain': '',
-        'output_size': 512,
-        'dropout_rate': 0.25,
-        'hidden_size': 512,
-        'hidden_act': 'gelu',
-        'initializer_range': 0.02,
-        'vocab_size': 30522,
-        'hidden_dropout_prob': 0.1,
-        'num_attention_heads': 8,
-        'type_vocab_size': 2,
-        'max_position_embeddings': 512,
-        'num_hidden_layers': 4,
-        'intermediate_size': 2048,
-        'attention_probs_dropout_prob': 0.0,
-    }
+    # model_config = {
+    #     'name': 'bert-base-cased',
+    #     'use_pretrain': '',
+    #     'output_size': 512,
+    #     'dropout_rate': 0.25,
+    #     'hidden_size': 512,
+    #     'hidden_act': 'gelu',
+    #     'initializer_range': 0.02,
+    #     'vocab_size': 30522,
+    #     'hidden_dropout_prob': 0.1,
+    #     'num_attention_heads': 8,
+    #     'type_vocab_size': 2,
+    #     'max_position_embeddings': 512,
+    #     'num_hidden_layers': 4,
+    #     'intermediate_size': 2048,
+    #     'attention_probs_dropout_prob': 0.0,
+    # }
 
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
 
