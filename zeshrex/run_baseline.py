@@ -1,6 +1,7 @@
 import logging
 import os
 import torch
+import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, precision_score, recall_score
 from torch import nn
 from torch.utils.data import DataLoader
@@ -18,85 +19,101 @@ class RelationClassifier(nn.Module):
     def __init__(self, model_name, hidden_size, num_classes):
         super(RelationClassifier, self).__init__()
 
-        # self.bert_config = BertConfig.from_dict(model_config)
-        # self.bert = BertModel.from_pretrained(model_name, config=self.bert_config)
+        self.bert_config = BertConfig.from_pretrained(model_name, num_labels=num_classes)
+        self.bert = BertModel.from_pretrained(model_name, config=self.bert_config)
 
-        self.bert = BertModel.from_pretrained(model_name)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fclayer = nn.Linear(self.bert_config.hidden_size * 3, relation_embedding_dim)
+        self.classifier = nn.Linear(relation_embedding_dim, num_classes)
 
-        self.fc1 = nn.Linear(self.bert.config.hidden_size, hidden_size)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_size, num_classes)
+        # -------------------------------------------------------------
+        # self.fc1 = nn.Linear(self.bert.config.hidden_size, hidden_size)
+        # self.relu = nn.ReLU()
+        # self.fc2 = nn.Linear(hidden_size, num_classes)
 
-        self.cls_fc_layer = FCLayer(
-            input_dim=hidden_size,
-            output_dim=hidden_size,
-            dropout_rate=dropout_rate,
-        )
-        self.entity_fc_layer = FCLayer(
-            input_dim=hidden_size,
-            output_dim=hidden_size,
-            dropout_rate=dropout_rate,
-        )
-        self.dim_reduction_fc_layer = FCLayer(
-            input_dim=hidden_size * 3,
-            output_dim=output_size,
-            dropout_rate=dropout_rate,
-        )
+        # self.cls_fc_layer = FCLayer(
+        #     input_dim=hidden_size,
+        #     output_dim=hidden_size,
+        #     dropout_rate=dropout_rate,
+        # )
+        # self.entity_fc_layer = FCLayer(
+        #     input_dim=hidden_size,
+        #     output_dim=hidden_size,
+        #     dropout_rate=dropout_rate,
+        # )
+        # self.dim_reduction_fc_layer = FCLayer(
+        #     input_dim=hidden_size * 3,
+        #     output_dim=output_size,
+        #     dropout_rate=dropout_rate,
+        # )
 
     def forward(self, input_ids, attention_masks, token_type_ids, e1_masks, e2_masks, labels):
         # Pass the inputs through BERT
         outputs = self.bert(input_ids, attention_mask=attention_masks, token_type_ids=token_type_ids)
 
+        # Sequence of hidden-states of the last layer.
         sequence_output = outputs[0]
-        pooled_output = outputs[1]  # [CLS]
 
-        # Average
-        e1_h = self._entity_average(sequence_output, e1_masks)
-        e2_h = self._entity_average(sequence_output, e2_masks)
+        # Last layer hidden-state of the [CLS] token further processed by a Linear layer and a Tanh activation function.
+        pooled_output = outputs[1]
 
-        # Dropout -> tanh -> fc_layer (Share FC layer for e1 and e2)
-        pooled_output = self.cls_fc_layer(pooled_output)
-        e1_h = self.entity_fc_layer(e1_h)
-        e2_h = self.entity_fc_layer(e2_h)
+        # Entities extraction
+        e1_h = self.extract_entity(sequence_output, e1_masks)
+        e2_h = self.extract_entity(sequence_output, e2_masks)
 
-        # Concat -> fc_layer -> classifier_fc_layer
-        concat_h = torch.cat([pooled_output, e1_h, e2_h], dim=-1)
-        reduced_concat_h = self.dim_reduction_fc_layer(concat_h)
+        context = self.dropout(pooled_output)
 
-        # Use the [CLS] embedding as the sentence representation
-        out = reduced_concat_h  # [:, 0, :]
-        out = self.fc1(out)
-        out = self.relu(out)
-        out = self.fc2(out)
-        return out
+        pooled_output = torch.cat([context, e1_h, e2_h], dim=-1)
+        pooled_output = torch.tanh(pooled_output)
+        pooled_output = self.fclayer(pooled_output)
+
+        relation_embeddings = torch.tanh(pooled_output)
+        relation_embeddings = self.dropout(relation_embeddings)
+
+        logits = self.classifier(relation_embeddings)  # [batch_size x hidden_size]
+
+        outputs = (logits,) + outputs[2:]  # add hidden states and attention if they are here
+
+        return outputs, relation_embeddings  # (loss), logits, (hidden_states), (attentions)
+
+        # -------------------------------------------------------------
+        # # Dropout -> tanh -> fc_layer (Share FC layer for e1 and e2)
+        # pooled_output = self.cls_fc_layer(pooled_output)
+        # e1_h = self.entity_fc_layer(e1_h)
+        # e2_h = self.entity_fc_layer(e2_h)
+
+        # # Concat -> fc_layer -> classifier_fc_layer
+        # concat_h = torch.cat([pooled_output, e1_h, e2_h], dim=-1)
+        # reduced_concat_h = self.dim_reduction_fc_layer(concat_h)
+
+        # # Use the [CLS] embedding as the sentence representation
+        # out = reduced_concat_h  # [:, 0, :]
+        # out = self.fc1(out)
+        # out = self.relu(out)
+        # out = self.fc2(out)
+        # return out
 
     @staticmethod
-    def _entity_average(hidden_output, e_mask):
-        """
-        Average the entity hidden state vectors (H_i ~ H_j)
-        :param hidden_output: [batch_size, j-i+1, dim]
-        :param e_mask: [batch_size, max_seq_len]
-                e.g. e_mask[0] == [0, 0, 0, 1, 1, 1, 0, 0, ... 0]
-        :return: [batch_size, dim]
-        """
-        e_mask_unsqueeze = e_mask.unsqueeze(1)  # [b, 1, j-i+1]
-        length_tensor = (e_mask != 0).sum(dim=1).unsqueeze(1)  # [batch_size, 1]
-
-        # [b, 1, j-i+1] * [b, j-i+1, dim] = [b, 1, dim] -> [b, dim]
-        sum_vector = torch.bmm(e_mask_unsqueeze.float(), hidden_output).squeeze(1)
-        avg_vector = sum_vector.float() / length_tensor.float()  # broadcasting
-        return avg_vector
+    def extract_entity(sequence_output, e_mask):
+        extended_e_mask = e_mask.unsqueeze(1)
+        extended_e_mask = torch.bmm(extended_e_mask.float(), sequence_output).squeeze(1)
+        return extended_e_mask.float()
 
 
 def eval_model(model, device, test_dataloader, criterion):
+    logging.info('==========')
+    logging.info('Evaluation')
+    logging.info('==========')
+
     model.eval()
+    
     total_loss, total_accuracy = 0, 0
     total_preds = []
     total_labels = []
 
     for step, batch in enumerate(test_dataloader):
-        if step % 50 == 0 and not step == 0:
-            logging.info('Batch {:>5,} of {:>5,}'.format(step, len(test_dataloader)))
+        if step % 10 == 0 and not step == 0:
+            logging.info('Evaluation: Batch {:>5,} of {:>5,}'.format(step, len(test_dataloader)))
 
         batch = tuple(t.to(device) for t in batch)
 
@@ -111,14 +128,16 @@ def eval_model(model, device, test_dataloader, criterion):
         labels = batch[5]
 
         with torch.no_grad():
-            outputs = model(**inputs)
+            outputs, _ = model(**inputs)
 
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs[0], labels)
         total_loss += loss.item()
 
-        preds = torch.argmax(outputs, dim=1).flatten()
+        preds = torch.argmax(outputs[0], dim=1).flatten()
         total_preds.extend(preds.cpu().numpy())
         total_labels.extend(labels.cpu().numpy())
+
+    print(set(total_preds), set(total_labels))
 
     avg_loss = total_loss / len(test_dataloader)
     precision = precision_score(total_labels, total_preds, average='macro')
@@ -165,6 +184,8 @@ def run_baseline():
     global_steps_count = 0
     steps_per_epoch = len(train_loader)
 
+    losses = []
+
     # Training loop
     # -------------
     for epoch in range(num_epochs):
@@ -192,52 +213,67 @@ def run_baseline():
             }
             labels = batch[5]
 
-            outputs = model(**inputs)
-            loss = criterion(outputs, labels)
+            outputs, relation_embedding = model(**inputs)
+            loss = criterion(outputs[0], labels)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
+
             running_loss += loss.item()
-            if steps_count % 50 == 0:
-                logging.info(
-                    'Epoch {:^3} Step {:^5} --- '
-                    'Average loss (over {:^5} training steps out of {}): {:.5f}'.format(
-                        epoch + 1,
-                        global_steps_count,
-                        steps_count,
-                        steps_per_epoch,
-                        running_loss / steps_count,
-                    )
+            
+            avg_loss = running_loss / steps_count
+            losses.append(avg_loss)
+            logging.info(
+                'Epoch {:^3} Step {:^5} --- '
+                'Average loss (over {:^5} training steps out of {}): {:.5f}'.format(
+                    epoch + 1,
+                    global_steps_count,
+                    steps_count,
+                    steps_per_epoch,
+                    running_loss / steps_count,
                 )
+            )
+            # Plot the loss
+            plt.figure(figsize=(10, 5))
+            plt.plot(losses)
+            plt.ylabel('Loss')
+            plt.xlabel('Step')
+            plt.title('Training Loss')
+            (PROJECT_PATH / 'output').mkdir(exist_ok=True, parents=True)
+            plt.savefig(PROJECT_PATH / 'output' / 'loss_plot_webnlg.png')
+            # plt.savefig(PROJECT_PATH / 'output' / 'loss_plot_nyt.png')
+            plt.close()
 
-        # Print loss after every epoch
-        logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {running_loss / len(train_loader):.4f}")
-
-        # Calculate metrics on the validation set
-        avg_loss, precision, recall, f1 = eval_model(model, device, test_loader, criterion)
-        logging.info(f'Validation Loss: {avg_loss}, Precision: {precision}, Recall: {recall}, F1-score: {f1}')
+            # if steps_count % len(train_loader) == 0:
+            if steps_count % 10 == 0:
+                # Calculate metrics on the validation set
+                avg_loss, precision, recall, f1 = eval_model(model, device, test_loader, criterion)
+                logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {running_loss / len(train_loader):.4f}")
+                logging.info(f'Validation Loss: {avg_loss}, Precision: {precision}, Recall: {recall}, F1-score: {f1}')
 
 
 if __name__ == "__main__":
     init_logger(file_name='run_pipeline.log', level=logging.INFO)
 
-    gpu = 1
+    gpu = 0
 
-    model_name = 'bert-base-cased'
+    model_name = 'bert-large-cased'
     max_len = 200
     dataset_path = './datasets/prepared/WebNLG/'
+    # dataset_path = './datasets/prepared/NYT/'
     use_predefined_split = True
     use_zero_shot_split = False
 
-    batch_size = 110
-    eval_batch_size = 110
+    relation_embedding_dim = 1024
+
+    batch_size = 32
+    eval_batch_size = 32
     num_epochs = 10
 
     hidden_size = 768
     output_size = 768
-    dropout_rate = 0.25
+    dropout_rate = 0.1  # 0.25
 
     model_config = {
         'name': 'bert-base-cased',
