@@ -9,7 +9,7 @@ train:
   batch_size: 16
   num_epochs: 15
   weight_decay: 0.1
-  learning_rate: 2.0e-4  # The initial learning rate for Adam.
+  learning_rate: 1.0e-5  # The initial learning rate for Adam.
   warmup_steps: 500
   adam_epsilon: 1.0e-6  # Epsilon for Adam optimizer.
   max_grad_norm: 1.0  # Max gradient norm.

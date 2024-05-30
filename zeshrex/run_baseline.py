@@ -140,8 +140,6 @@ def eval_model(model, device, test_dataloader, criterion):
             total_preds.extend(preds.cpu().numpy())
             total_labels.extend(labels.cpu().numpy())
 
-    print(set(total_preds), set(total_labels))
-
     avg_loss = total_loss / len(test_dataloader)
     precision = precision_score(total_labels, total_preds, average='macro')
     recall = recall_score(total_labels, total_preds, average='macro')
@@ -180,7 +178,7 @@ def run_baseline():
     # Initialize the model, loss function and optimizer
     model = RelationClassifier(model_name=model_name, hidden_size=hidden_size, num_classes=len(train_dataset.labels))
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters())
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     model.to(device)
 
@@ -244,12 +242,12 @@ def run_baseline():
             plt.xlabel('Step')
             plt.title('Training Loss')
             (PROJECT_PATH / 'output').mkdir(exist_ok=True, parents=True)
-            plt.savefig(PROJECT_PATH / 'output' / 'loss_plot_webnlg.png')
-            # plt.savefig(PROJECT_PATH / 'output' / 'loss_plot_nyt.png')
+            # plt.savefig(PROJECT_PATH / 'output' / 'loss_plot_webnlg.png')
+            plt.savefig(PROJECT_PATH / 'output' / 'loss_plot_nyt.png')
             plt.close()
 
-            # if steps_count % len(train_loader) == 0:
-            if steps_count % 10 == 0:
+            if steps_count % len(train_loader) == 0:
+            # if steps_count % 100 == 0:
                 # Calculate metrics on the validation set
                 avg_loss, precision, recall, f1 = eval_model(model, device, test_loader, criterion)
                 logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {running_loss / len(train_loader):.4f}")
@@ -261,22 +259,24 @@ if __name__ == "__main__":
 
     gpu = 0
 
-    model_name = 'bert-large-cased'
+    model_name = 'bert-base-cased'
     max_len = 200
-    dataset_path = './datasets/prepared/WebNLG/'
-    # dataset_path = './datasets/prepared/NYT/'
+    # dataset_path = './datasets/prepared/WebNLG/'
+    dataset_path = './datasets/prepared/NYT/'
     use_predefined_split = True
     use_zero_shot_split = False
 
-    relation_embedding_dim = 1024
+    relation_embedding_dim = 768
 
-    batch_size = 32
-    eval_batch_size = 32
-    num_epochs = 10
+    batch_size = 64
+    eval_batch_size = 128
+    num_epochs = 1
 
-    hidden_size = 768
-    output_size = 768
+    hidden_size = 512
+    output_size = 512
     dropout_rate = 0.1  # 0.25
+
+    lr = 1.0e-5
 
     # model_config = {
     #     'name': 'bert-base-cased',
