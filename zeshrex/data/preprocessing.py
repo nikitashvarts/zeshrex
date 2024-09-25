@@ -23,27 +23,27 @@ class SentenceTokenizationPreprocessor(BasePreprocessor):
     def __call__(self, text):
         if self.truncate_from_tail:
             tokenized_dict = self.tokenizer.encode_plus(text, truncation=False)
-            input_ids, input_masks = tokenized_dict['input_ids'], tokenized_dict['attention_mask']
+            input_ids, input_mask = tokenized_dict['input_ids'], tokenized_dict['attention_mask']
 
             input_ids = input_ids[-self.max_len :]
             input_ids[0] = self.cls_id
-            input_masks = input_masks[-self.max_len :]
+            input_mask = input_mask[-self.max_len :]
             input_ids += [self.pad_id] * (self.max_len - len(input_ids))
-            input_masks += [0] * (self.max_len - len(input_masks))
+            input_mask += [0] * (self.max_len - len(input_mask))
 
             assert len(input_ids) == self.max_len
-            assert len(input_masks) == self.max_len
+            assert len(input_mask) == self.max_len
 
         else:
             tokenized_dict = self.tokenizer.encode_plus(
                 text, max_length=self.max_len, pad_to_max_length=True, truncation=True
             )
-            input_ids, input_masks = tokenized_dict['input_ids'], tokenized_dict['attention_mask']
+            input_ids, input_mask = tokenized_dict['input_ids'], tokenized_dict['attention_mask']
 
             assert len(input_ids) == self.max_len
-            assert len(input_masks) == self.max_len
+            assert len(input_mask) == self.max_len
 
-        return input_ids, input_masks
+        return input_ids, input_mask
 
 
 class RelationTokenizationPreprocessor(BasePreprocessor):

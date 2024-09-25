@@ -1,6 +1,7 @@
 import logging
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Dict, Any, List, Optional
 
 import matplotlib.pyplot as plt
@@ -99,158 +100,185 @@ def eval_zero_shot_model(
         device: torch.device,
         dataloader: DataLoader,
         relations: Dict[str, int],
+        criterion: nn.Module,
         output_dir: Optional[os.PathLike] = None,
         tag: Optional[str] = None,
 ):
     model.eval()
     label_to_relation: [int, str] = {v: k for k, v in relations.items()}
-    with torch.no_grad():
-        metrics = {}
-        embeddings_clusters: Dict[int, List[np.ndarray]] = {}
-        for step, batch in enumerate(dataloader):
-            batch = tuple(t.to(device) for t in batch)
+    
+    metrics = {}
+    embeddings_clusters: Dict[int, List[np.ndarray]] = {}
+    for step, batch in enumerate(dataloader):
+        batch = tuple(t.to(device) for t in batch)
 
-            # inputs = {
-            #     'input_ids': batch[0],
-            #     'attention_masks': batch[1],
-            #     'token_type_ids': batch[2],
-            #     'e1_masks': batch[3],
-            #     'e2_masks': batch[4],
-            #     'labels': batch[5],
-            # }
-            # labels = batch[5]
+        inputs = {
+            'anchor_input_ids': batch[0],
+            'anchor_attention_mask': batch[1],
+            'anchor_token_type_ids': batch[2],
+            'anchor_e1_mask': batch[3],
+            'anchor_e2_mask': batch[4],
+            'pos_input_ids': batch[5],
+            'pos_attention_mask': batch[6],
+            'pos_token_type_ids': batch[7],
+            'pos_e1_mask': batch[8],
+            'pos_e2_mask': batch[9],
+            'neg_input_ids': batch[10],
+            'neg_attention_mask': batch[11],
+            'neg_token_type_ids': batch[12],
+            'neg_e1_mask': batch[13],
+            'neg_e2_mask': batch[14],
+            # 'labels': batch[15],
+            # 'desc_input_ids': batch[16],
+            # 'desc_attention_mask': batch[17],
+        }
+        labels = batch[15]
 
-            inputs = {
-                'anchor_input_ids': batch[0],
-                'anchor_attention_masks': batch[1],
-                'anchor_token_type_ids': batch[2],
-                'anchor_e1_masks': batch[3],
-                'anchor_e2_masks': batch[4],
-                'pos_input_ids': batch[5],
-                'pos_attention_masks': batch[6],
-                'pos_token_type_ids': batch[7],
-                'pos_e1_masks': batch[8],
-                'pos_e2_masks': batch[9],
-                'neg_input_ids': batch[10],
-                'neg_attention_masks': batch[11],
-                'neg_token_type_ids': batch[12],
-                'neg_e1_masks': batch[13],
-                'neg_e2_masks': batch[14],
-                'labels': batch[15],
-                'desc_input_ids': batch[16],
-                'desc_attention_masks': batch[17],
-            }
-            labels = batch[15]
-
-            loss, embeddings_batch = model(**inputs)
+        with torch.no_grad():
+            anchor_embeddings, positive_embeddings, negative_embeddings = model(**inputs)
+            loss = criterion(anchor_embeddings, positive_embeddings, negative_embeddings)
 
             # labels_arr = inputs['labels'].cpu().detach().numpy()
             labels_arr = labels.cpu().detach().numpy()
 
-            embeddings_batch_arr = embeddings_batch.cpu().detach().numpy()
-            for label, embedding in zip(labels_arr, embeddings_batch_arr):
-                embeddings_clusters[label] = embeddings_clusters.get(label, []) + [embedding]
+            embeddings_batch_arr = anchor_embeddings.cpu().detach().numpy()
+        
+        for label, embedding in zip(labels_arr, embeddings_batch_arr):
+            embeddings_clusters[label] = embeddings_clusters.get(label, []) + [embedding]
 
-            metrics['loss'] = metrics.get('loss', []) + [float(loss)]
+        metrics['loss'] = metrics.get('loss', []) + [float(loss)]
 
-        cluster_centers: Dict[int, np.ndarray] = {}
-        for label, embeddings_list in embeddings_clusters.items():
-            cluster_centers[label] = np.mean(embeddings_list, axis=0)
+    cluster_centers: Dict[int, np.ndarray] = {}
+    for label, embeddings_list in embeddings_clusters.items():
+        cluster_centers[label] = np.mean(embeddings_list, axis=0)
 
-        distances = {}
-        for label, data in embeddings_clusters.items():
-            center = cluster_centers[label]
-            distance_to_center = np.linalg.norm(data - center, axis=1)
-            distances[label] = {
-                "inner_distance": np.mean(distance_to_center),
-                "outer_distance": np.min(
-                    [
-                        np.linalg.norm(center - other_center)
-                        for other_label, other_center in cluster_centers.items()
-                        if other_label != label
-                    ]
-                )
-            }
-
-        index_to_relation = {v: k for k, v in relations.items()}
-        logging.info('| {:^30} | {:^20} | {:^20} |'.format('Relation', 'Inner Dist', 'Min Outer Dist'))
-        for relation_index, dist_data in distances.items():
-            inner = dist_data['inner_distance']
-            outer = dist_data['outer_distance']
-            logging.info(
-                '| {:^30} | {:^20.7f} | {:^20.7f} |'.format(index_to_relation[relation_index], inner, outer)
+    distances = {}
+    for label, data in embeddings_clusters.items():
+        center = cluster_centers[label]
+        distance_to_center = np.linalg.norm(data - center, axis=1)
+        distances[label] = {
+            "inner_distance": np.mean(distance_to_center),
+            "outer_distance": np.min(
+                [
+                    np.linalg.norm(center - other_center)
+                    for other_label, other_center in cluster_centers.items()
+                    if other_label != label
+                ]
             )
-
-        avg_loss = np.mean(metrics['loss'])
-        results = {
-            'eval_loss': np.round(avg_loss, 5),
-            'avg_inner_distance': np.round(np.mean([data['inner_distance'] for _, data in distances.items()]), 7),
-            'avg_outer_distance': np.round(np.mean([data['outer_distance'] for _, data in distances.items()]), 7),
         }
 
-        visualize_clusters(embeddings_clusters, label_to_relation, output_dir, tag)
-
-        return results
-
-
-def eval_model(model: Model, device: torch.device, dataloader: DataLoader, relations: Dict[str, int]) -> Dict[str, Any]:
-    model.eval()
-    with torch.no_grad():
-        metrics = {}
-        for step, batch in enumerate(dataloader):
-            batch = tuple(t.to(device) for t in batch)
-            inputs = {
-                'input_ids': batch[0],
-                'attention_masks': batch[1],
-                'token_type_ids': batch[2],
-                'e1_masks': batch[3],
-                'e2_masks': batch[4],
-                'labels': batch[5],
-            }
-
-            (loss, logits), embeddings = model(**inputs)
-            probabilities = nn.functional.softmax(logits, dim=-1)
-
-            pred_labels = probabilities.cpu().detach().numpy().argmax(axis=1)
-            true_labels = inputs['labels'].cpu().detach().numpy()
-
-            precision, recall, f1_score, support = precision_recall_fscore_support(
-                y_true=true_labels,
-                y_pred=pred_labels,
-                labels=list(relations.values()),
-                zero_division=0,
-            )
-
-            metrics['precision'] = metrics.get('precision', []) + [precision]
-            metrics['recall'] = metrics.get('recall', []) + [recall]
-            metrics['f1_score'] = metrics.get('f1_score', []) + [f1_score]
-            metrics['loss'] = metrics.get('loss', []) + [float(loss)]
-
-        precision_batch_mean = np.mean(metrics['precision'], axis=0)
-        recall_batch_mean = np.mean(metrics['recall'], axis=0)
-        f1_score_batch_mean = np.mean(metrics['f1_score'], axis=0)
-
-        logging.info('| {:^30} | {:^11} | {:^10} | {:^10} |'.format('Relation', 'Precision', 'Recall', 'F1-score'))
-        for relation, p, r, f1 in zip(relations.keys(), precision_batch_mean, recall_batch_mean, f1_score_batch_mean):
-            logging.info('| {:^30} | {:^11.5f} | {:^10.5f} | {:^10.5f} |'.format(relation, p, r, f1))
-
-        sorted_index = np.argsort(f1_score_batch_mean)[::-1][:5]
+    index_to_relation = {v: k for k, v in relations.items()}
+    logging.info('| {:^30} | {:^20} | {:^20} |'.format('Relation', 'Inner Dist', 'Min Outer Dist'))
+    for relation_index, dist_data in distances.items():
+        inner = dist_data['inner_distance']
+        outer = dist_data['outer_distance']
         logging.info(
-            'TOP-5 macro average: '
-            f'Precision: {np.mean(precision_batch_mean[sorted_index])} | '
-            f'Recall: {np.mean(recall_batch_mean[sorted_index])} | '
-            f'F1-score: {np.mean(f1_score_batch_mean[sorted_index])}'
+            '| {:^30} | {:^20.7f} | {:^20.7f} |'.format(index_to_relation[relation_index], inner, outer)
         )
 
-        precision_macro = np.mean(precision_batch_mean)
-        recall_macro = np.mean(recall_batch_mean)
-        f1_score_macro = np.mean(f1_score_batch_mean)
-        avg_loss = np.mean(metrics['loss'])
+    avg_loss = np.mean(metrics['loss'])
+    results = {
+        'eval_loss': np.round(avg_loss, 5),
+        'avg_inner_distance': np.round(np.mean([data['inner_distance'] for _, data in distances.items()]), 7),
+        'avg_outer_distance': np.round(np.mean([data['outer_distance'] for _, data in distances.items()]), 7),
+    }
 
-        results = {
-            'eval_loss': np.round(avg_loss, 5),
-            'f1_score_macro': np.round(f1_score_macro, 5),
-            'precision_macro': np.round(precision_macro, 5),
-            'recall_macro': np.round(recall_macro, 5),
-        }
+    visualize_clusters(embeddings_clusters, label_to_relation, output_dir, tag)
+
+    return results
+
+
+def eval_classification_model(
+        cfg: SimpleNamespace,
+        model: Model,
+        device: torch.device,
+        dataloader: DataLoader,
+        relations: Dict[str, int],
+        criterion: nn.Module,
+    ) -> Dict[str, Any]:
+    logging.info('==========')
+    logging.info('Evaluation')
+    logging.info('==========')
+
+    model.eval()
+    softmax = torch.nn.Softmax(dim=1)
+
+    steps_per_evaluation = len(dataloader)
+    running_loss: float = 0.0
+    steps_count: int = 0
+
+    total_preds = []
+    total_labels = []
+    metrics = {}
+
+    for batch in dataloader:
+        steps_count += 1
+        
+        batch = tuple(t.to(device) for t in batch)
+
+        inputs = {
+                'input_ids': batch[0],
+                'attention_mask': batch[1],
+                'token_type_ids': batch[2],
+                'e1_mask': batch[3],
+                'e2_mask': batch[4],
+            }
+        labels = batch[5]
+
+        with torch.no_grad():
+            outputs, _ = model(**inputs)
+
+            loss = criterion(outputs, labels)
+            running_loss += loss.item()
+
+            avg_loss = running_loss / steps_count
+
+            probs = softmax(outputs)
+            preds = torch.argmax(probs, dim=1)
+            total_preds.extend(preds.cpu().numpy())
+            total_labels.extend(labels.cpu().numpy())
+
+        if steps_count % cfg.general.log_frequency == 0:
+            logging.info(
+                    'Evaluation step {:^5} out of {} --- '
+                    'Average loss: {:.5f}'.format(
+                        steps_count,
+                        steps_per_evaluation,
+                        running_loss / steps_count,
+                    )
+                )
+
+    precision, recall, f1_score, _ = precision_recall_fscore_support(
+        y_true=total_labels,
+        y_pred=total_preds,
+        labels=list(relations.values()),
+        zero_division=0,
+    )
+
+    logging.info('--------------')
+    logging.info('Metrics Report')
+    logging.info('--------------')
+    
+    logging.info('| {:^30} | {:^11} | {:^10} | {:^10} |'.format('Relation', 'Precision', 'Recall', 'F1-score'))
+    for relation, p, r, f1 in zip(relations.keys(), precision, recall, f1_score):
+        logging.info('| {:^30} | {:^11.5f} | {:^10.5f} | {:^10.5f} |'.format(relation, p, r, f1))
+
+    sorted_index = np.argsort(f1_score)[::-1][:5]
+    logging.info(
+        'TOP-5 macro average: '
+        f'Precision: {np.mean(precision[sorted_index])} | '
+        f'Recall: {np.mean(recall[sorted_index])} | '
+        f'F1-score: {np.mean(f1_score[sorted_index])}'
+    )
+
+    precision_macro = np.mean(precision)
+    recall_macro = np.mean(recall)
+    f1_score_macro = np.mean(f1_score)
+
+    results = {
+        'eval_loss': np.round(avg_loss, 5),
+        'f1_score_macro': np.round(f1_score_macro, 5),
+        'precision_macro': np.round(precision_macro, 5),
+        'recall_macro': np.round(recall_macro, 5),
+    }
     return results
