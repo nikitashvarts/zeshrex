@@ -11,7 +11,7 @@ from zeshrex import CONFIG_FILE_PATH, PROJECT_PATH
 from zeshrex.data.datasets import RelationDataset
 from zeshrex.data.preprocessing import RelationTokenizationPreprocessor
 from zeshrex.model import RelationClassifierModel
-from zeshrex.model.relation_model import RelationTripletsModel
+from zeshrex.model.relation_model import RelationTripletsClassificationModel, RelationTripletsModel
 from zeshrex.training import (
     run_metric_classification_training,
     run_classification_training,
@@ -52,9 +52,26 @@ def run_pipeline(cfg: SimpleNamespace):
 
         run_classification_training(cfg, model, train_dataset, test_dataset, val_dataset, device)
 
-    if cfg.train.criterion == 'TripletLoss':
+    elif cfg.train.criterion == 'TripletLoss':
         model = RelationTripletsModel(
             base_model=base_model,
+            out_embedding_size=cfg.model.relation_embedding_size,
+            dropout_rate=cfg.model.dropout_rate,
+        )
+
+        device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model.to(device)
+
+        run_metric_classification_training(cfg, model, train_dataset, test_dataset, val_dataset, tokenizer, device)
+
+    elif cfg.train.criterion == 'TripletClassificationLoss':
+        sentence_model = AutoModel.from_pretrained(cfg.model.name)  # TODO: make a separate param
+        num_classes = len(train_dataset.labels)
+
+        model = RelationTripletsClassificationModel(
+            base_model=base_model,
+            sentence_model=sentence_model,
+            num_classes=num_classes,
             out_embedding_size=cfg.model.relation_embedding_size,
             dropout_rate=cfg.model.dropout_rate,
         )
@@ -75,8 +92,8 @@ def set_seed(seed):
 
 
 if __name__ == '__main__':
-    # init_logger(file_name='run_pipeline.log', level=logging.INFO)
-    init_logger(file_name=None, level=logging.INFO)  # TODO: remove debug
+    init_logger(file_name='run_pipeline.log', level=logging.INFO)
+    # init_logger(file_name=None, level=logging.INFO)  # TODO: remove debug
 
     config: SimpleNamespace = load_yaml_config(CONFIG_FILE_PATH, convert_to_namespace=True)
     print_configs(config, print_function=logging.info)

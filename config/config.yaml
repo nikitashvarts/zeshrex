@@ -1,5 +1,5 @@
 general:
-  gpu: 0
+  gpu: 1
   seed: 42
   n_workers: 1
   models_output_dir: ./models/
@@ -7,7 +7,7 @@ general:
   log_frequency: 10
 
 train:
-  criterion: CrossEntropyLoss  # ['CrossEntropyLoss', 'TripletLoss']
+  criterion: TripletLoss  # ['CrossEntropyLoss', 'TripletLoss']
   batch_size: 16
   num_epochs: 5
   weight_decay: 0.1
@@ -18,7 +18,7 @@ train:
   gradient_accumulation_steps: 1  # Number of updates steps to accumulate before performing a backward/update pass
   eval_frequency: 500
   eval_batch_size: 32
-  triplet_margin: 7.5
+  triplet_margin: 0.5
 
 model:
   name: bert-base-cased  # ['intfloat/e5-base-v2', 'bert-base-cased', 'DeepPavlov/rubert-base-cased']

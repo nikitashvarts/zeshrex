@@ -17,9 +17,11 @@ from zeshrex.data.datasets import (
     collate_data_triplets,
 )
 from zeshrex.data.preprocessing import (
+    RelationTokenizationPreprocessor,
     SentenceTokenizationPreprocessor,
 )
 from zeshrex.evaluation import eval_classification_model, eval_zero_shot_model
+from zeshrex.loss.triplet_loss import TripletClassificationCosineMarginLoss, TripletCosineMarginLoss
 from zeshrex.model import Model
 
 
@@ -124,7 +126,7 @@ def run_metric_classification_training(
     train_dataset: Dataset,
     test_dataset: Dataset,
     val_dataset: Dataset,
-    tokenizer,
+    tokenizer,  # TODO: define type
     device: torch.device,
 ):
     sentence_preprocessor = SentenceTokenizationPreprocessor(tokenizer=tokenizer, max_len=cfg.dataset.max_len)
@@ -158,7 +160,9 @@ def run_metric_classification_training(
         collate_fn=collate_data_triplets,
     )
 
-    criterion = nn.TripletMarginLoss(margin=cfg.train.triplet_margin, p=2, eps=1e-7)
+    # criterion = nn.TripletMarginLoss(margin=cfg.train.triplet_margin, p=2, eps=1e-7)
+    criterion = TripletCosineMarginLoss(margin=cfg.train.triplet_margin)
+    # criterion = TripletClassificationCosineMarginLoss(margin=cfg.train.triplet_margin)  # TODO: add alpha parameter
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.train.learning_rate)
 
     global_steps_count = 0
@@ -188,24 +192,35 @@ def run_metric_classification_training(
                 'anchor_token_type_ids': batch[2],
                 'anchor_e1_mask': batch[3],
                 'anchor_e2_mask': batch[4],
+                
                 'pos_input_ids': batch[5],
                 'pos_attention_mask': batch[6],
-                'pos_token_type_ids': batch[7],
-                'pos_e1_mask': batch[8],
-                'pos_e2_mask': batch[9],
-                'neg_input_ids': batch[10],
-                'neg_attention_mask': batch[11],
-                'neg_token_type_ids': batch[12],
-                'neg_e1_mask': batch[13],
-                'neg_e2_mask': batch[14],
+                'pos_token_type_ids': None,
+                'pos_e1_mask': None,
+                'pos_e2_mask': None,
+
+                # 'pos_token_type_ids': batch[7],
+                # 'pos_e1_mask': batch[8],
+                # 'pos_e2_mask': batch[9],
+                
+                'neg_input_ids': batch[7],
+                'neg_attention_mask': batch[8],
+                'neg_token_type_ids': batch[9],
+                'neg_e1_mask': batch[10],
+                'neg_e2_mask': batch[11],
+                
                 # 'labels': batch[15],
-                # 'desc_input_ids': batch[16],
-                # 'desc_attention_mask': batch[17],
+                
+                # 'desc_input_ids': batch[13],
+                # 'desc_attention_mask': batch[14],
             }
-            labels = batch[15]
+            labels = batch[12]
 
             anchor_embeddings, positive_embeddings, negative_embeddings = model(**inputs)
             loss = criterion(anchor_embeddings, positive_embeddings, negative_embeddings)
+            
+            # anchor_embeddings, positive_embeddings, negative_embeddings, desc_embeddings, logits = model(**inputs)
+            # loss = criterion(anchor_embeddings, desc_embeddings, negative_embeddings, logits, labels)
 
             optimizer.zero_grad()
             loss.backward()

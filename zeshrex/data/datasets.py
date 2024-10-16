@@ -288,7 +288,8 @@ class TripletsRelationDataset(Dataset):
                     negative_sample, negative_relation = random.choice(data)
                     if negative_relation != anchor_relation:
                         break
-                triplets.append(((*anchor_sample, *positive_sample, *negative_sample), anchor_relation, desc_sample))
+                #: TODO: refactor (desc_sample instead of positive)
+                triplets.append(((*anchor_sample, *desc_sample, *negative_sample), anchor_relation, desc_sample))
             pbar.update(1)
         pbar.close()
 
