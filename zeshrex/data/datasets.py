@@ -155,6 +155,9 @@ class RelationDataset(Dataset):
         unseen_relations = set(rng.choice(relations, size=int(len(relations) * unseen_classes_ratio), replace=False))
         seen_relations = set(rel for rel in relations if rel not in unseen_relations)
 
+        unseen_relations = set(['ethnicGroup', 'creator', 'language', 'number'])
+        seen_relations = set(rel for rel in relations if rel not in unseen_relations)
+
         split_data: Dict[str, Data] = {}
         split_indexes: Dict[str, List[int]] = {}
 
@@ -289,7 +292,7 @@ class TripletsRelationDataset(Dataset):
                     if negative_relation != anchor_relation:
                         break
                 #: TODO: refactor (desc_sample instead of positive)
-                triplets.append(((*anchor_sample, *desc_sample, *negative_sample), anchor_relation, desc_sample))
+                triplets.append(((*anchor_sample, *positive_sample, *negative_sample), anchor_relation, desc_sample))
             pbar.update(1)
         pbar.close()
 

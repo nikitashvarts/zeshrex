@@ -115,6 +115,9 @@ class RelationTripletsClassificationModel(RelationTripletsModel):
         self._sentence_model = sentence_model
         self._classifier = nn.Linear(out_embedding_size, num_classes)
 
+        for param in self._sentence_model.parameters():
+            param.requires_grad = False
+
     def forward(
         self,
         anchor_input_ids: torch.Tensor,

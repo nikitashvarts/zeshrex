@@ -7,7 +7,7 @@ general:
   log_frequency: 10
 
 train:
-  criterion: TripletLoss  # ['CrossEntropyLoss', 'TripletLoss']
+  criterion: TripletClassificationLoss  # ['CrossEntropyLoss', 'TripletLoss', 'TripletClassificationLoss']
   batch_size: 16
   num_epochs: 5
   weight_decay: 0.1
@@ -21,7 +21,7 @@ train:
   triplet_margin: 0.5
 
 model:
-  name: bert-base-cased  # ['intfloat/e5-base-v2', 'bert-base-cased', 'DeepPavlov/rubert-base-cased']
+  name: intfloat/e5-base-v2  # ['intfloat/e5-base-v2', 'bert-base-cased', 'DeepPavlov/rubert-base-cased']
   relation_embedding_size: 768
   dropout_rate: 0.1
 

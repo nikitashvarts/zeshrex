@@ -121,28 +121,31 @@ def eval_zero_shot_model(
             
             'pos_input_ids': batch[5],
             'pos_attention_mask': batch[6],
-            'pos_token_type_ids': None,
-            'pos_e1_mask': None,
-            'pos_e2_mask': None,
+            # 'pos_token_type_ids': None,
+            # 'pos_e1_mask': None,
+            # 'pos_e2_mask': None,
 
-            # 'pos_token_type_ids': batch[7],
-            # 'pos_e1_mask': batch[8],
-            # 'pos_e2_mask': batch[9],
+            'pos_token_type_ids': batch[7],
+            'pos_e1_mask': batch[8],
+            'pos_e2_mask': batch[9],
             
-            'neg_input_ids': batch[7],
-            'neg_attention_mask': batch[8],
-            'neg_token_type_ids': batch[9],
-            'neg_e1_mask': batch[10],
-            'neg_e2_mask': batch[11],
+            'neg_input_ids': batch[10],
+            'neg_attention_mask': batch[11],
+            'neg_token_type_ids': batch[12],
+            'neg_e1_mask': batch[13],
+            'neg_e2_mask': batch[14],
             # 'labels': batch[15],
-            # 'desc_input_ids': batch[16],
-            # 'desc_attention_mask': batch[17],
+            'desc_input_ids': batch[16],
+            'desc_attention_mask': batch[17],
         }
-        labels = batch[12]
+        labels = batch[15]
 
         with torch.no_grad():
-            anchor_embeddings, positive_embeddings, negative_embeddings = model(**inputs)
-            loss = criterion(anchor_embeddings, positive_embeddings, negative_embeddings)
+            # anchor_embeddings, positive_embeddings, negative_embeddings = model(**inputs)
+            # loss = criterion(anchor_embeddings, positive_embeddings, negative_embeddings)
+
+            anchor_embeddings, positive_embeddings, negative_embeddings, desc_embeddings, logits = model(**inputs)
+            loss = criterion(anchor_embeddings, desc_embeddings, negative_embeddings, logits, labels)
 
             # labels_arr = inputs['labels'].cpu().detach().numpy()
             labels_arr = labels.cpu().detach().numpy()
