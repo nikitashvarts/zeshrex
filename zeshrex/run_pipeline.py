@@ -13,6 +13,7 @@ from zeshrex.data.preprocessing import RelationTokenizationPreprocessor
 from zeshrex.model import RelationClassifierModel
 from zeshrex.model.relation_model import RelationTripletsClassificationModel, RelationTripletsModel
 from zeshrex.training import (
+    run_metric_adaptive_classification_training,
     run_metric_classification_training,
     run_classification_training,
 )
@@ -64,13 +65,32 @@ def run_pipeline(cfg: SimpleNamespace):
 
         run_metric_classification_training(cfg, model, train_dataset, test_dataset, val_dataset, tokenizer, device)
 
+    # elif cfg.train.criterion == 'TripletClassificationLoss':
+    #     sentence_model = AutoModel.from_pretrained(cfg.model.name)  # TODO: make a separate param
+    #     num_classes = len(train_dataset.labels)
+
+    #     model = RelationTripletsClassificationModel(
+    #         base_model=base_model,
+    #         sentence_model=sentence_model,
+    #         num_classes=num_classes,
+    #         out_embedding_size=cfg.model.relation_embedding_size,
+    #         dropout_rate=cfg.model.dropout_rate,
+    #     )
+
+    #     device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #     model.to(device)
+
+    #     run_metric_classification_training(cfg, model, train_dataset, test_dataset, val_dataset, tokenizer, device)
+
+    # TODO: rename this scenario and uncomment code above
     elif cfg.train.criterion == 'TripletClassificationLoss':
         sentence_model = AutoModel.from_pretrained(cfg.model.name)  # TODO: make a separate param
-        num_classes = len(train_dataset.labels)
+        for param in sentence_model.parameters():
+            param.requires_grad = False
 
-        model = RelationTripletsClassificationModel(
+        num_classes = len(train_dataset.labels)
+        model = RelationClassifierModel(
             base_model=base_model,
-            sentence_model=sentence_model,
             num_classes=num_classes,
             out_embedding_size=cfg.model.relation_embedding_size,
             dropout_rate=cfg.model.dropout_rate,
@@ -78,8 +98,11 @@ def run_pipeline(cfg: SimpleNamespace):
 
         device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model.to(device)
+        sentence_model.to(device)
 
-        run_metric_classification_training(cfg, model, train_dataset, test_dataset, val_dataset, tokenizer, device)
+        # run_metric_classification_training(cfg, model, train_dataset, test_dataset, val_dataset, tokenizer, device)
+        run_metric_adaptive_classification_training(cfg, model, sentence_model, train_dataset, test_dataset, val_dataset, tokenizer, device)
+
 
     else:
         raise Exception(f'Unknown criterion for training: {cfg.train.criterion}!')

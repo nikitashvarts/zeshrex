@@ -238,6 +238,72 @@ class RelationDataset(Dataset):
         return relation_to_label
 
 
+class RelationWithDescriptionDataset(Dataset):
+    def __init__(
+            self,
+            data: RelationDataset,
+            desc_preprocessor: Optional[BasePreprocessor] = None,
+    ):
+        self._data = data
+        self._desc_preprocessor = desc_preprocessor
+
+        # TODO: make parametrized descriptions loading!
+        # -------------------------------------------------------
+        from datasets.preprocessing.common import load_relation_names
+        self.relation_to_desc = load_relation_names(
+            PROJECT_PATH / 'datasets' / 'raw' / 'WebNLG' / 'relation_names_top.tsv'
+        )
+
+        self.data = data
+        self.label_to_relation = {v: k for k, v in self.data._relation_to_label.items()}
+        # -------------------------------------------------------
+
+        self._dataset = self._connect_samples_with_description(data)
+
+    def __len__(self):
+        return len(self._dataset)
+
+    def __getitem__(self, index: int) -> Tuple[Tuple[Any, Any, Any], int, Any]:
+        return self._dataset[index]
+    
+    @staticmethod
+    def collate_data(batch) -> List[torch.Tensor]:
+        collated_data = {}
+        collated_labels = []
+        collated_desc = {}
+        for data, label, desc in batch:
+            for index, item in enumerate(data):
+                collated_data[index] = collated_data.get(index, []) + [list(item)]
+            collated_labels.append(label)
+            for index, item in enumerate(desc):
+                collated_desc[index] = collated_desc.get(index, []) + [list(item)]
+        
+        collated_tensors: List[torch.Tensor] = []
+        for collated_items in collated_data.values():
+            collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
+
+        collated_tensors.append(torch.tensor(collated_labels, dtype=torch.long))
+
+        for collated_items in collated_desc.values():
+            collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
+
+        return collated_tensors
+
+    def _connect_samples_with_description(
+        self,
+        data: RelationDataset,
+    ):
+        logging.info('Connecting samples with descriptions')
+        samples_with_desc: List[Tuple[Any, Any, Any]] = []
+
+        for sample, relation in tqdm(data):
+            desc_sample_text = self.relation_to_desc[self.label_to_relation[relation]]
+            desc_sample = self._desc_preprocessor(desc_sample_text)
+            samples_with_desc.append((sample, relation, desc_sample))
+
+        return samples_with_desc
+
+
 class TripletsRelationDataset(Dataset):
     def __init__(
             self,
@@ -247,6 +313,7 @@ class TripletsRelationDataset(Dataset):
     ) -> None:
         self._triplets_per_sample = triplets_per_sample
 
+        # TODO: make parametrized descriptions loading!
         # -------------------------------------------------------
         from datasets.preprocessing.common import load_relation_names
         self.relation_to_desc = load_relation_names(

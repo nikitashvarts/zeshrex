@@ -7,11 +7,13 @@ from typing import List
 import torch
 from matplotlib import pyplot as plt
 from torch import nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from zeshrex import PROJECT_PATH
 from zeshrex.data import Dataset
 from zeshrex.data.datasets import (
+    RelationWithDescriptionDataset,
     TripletsRelationDataset,
     collate_data,
     collate_data_triplets,
@@ -251,6 +253,187 @@ def run_metric_classification_training(
             if steps_count % cfg.train.eval_frequency == 0 or steps_count % len(train_loader) == 0:
                 val_result = eval_zero_shot_model(
                     model,
+                    device,
+                    val_loader,
+                    relations=test_dataset.relations_encoding,
+                    criterion=criterion,
+                    output_dir=PROJECT_PATH / 'output' / 'viz',  # TODO: make a param
+                    tag=f'{global_steps_count}steps',
+                )
+                logging.info(f"Epoch {epoch + 1}/{cfg.train.num_epochs}, Loss: {running_loss / len(train_loader):.4f}")
+
+
+def select_hard_negatives(embeddings, labels, device, margin=0.5, top_k=3):
+    """
+    Selects hard negatives within a batch based on cosine similarity.
+    
+    Args:
+        embeddings (torch.Tensor): Tensor of shape [batch_size, embedding_dim].
+        labels (torch.Tensor): Tensor of shape [batch_size], true labels for the batch.
+        margin (float): Minimum margin for cosine similarity to qualify as hard negative.
+        top_k (int): Number of hard negatives to select for each example.
+    
+    Returns:
+        hard_negatives_indices (list): A list of lists, where each sublist contains
+                                       indices of hard negatives for the corresponding
+                                       batch element.
+    """
+    batch_size = embeddings.size(0)
+    # Normalize embeddings for cosine similarity
+    normalized_embeddings = F.normalize(embeddings, p=2, dim=1)
+
+    # Compute cosine similarity between all pairs in the batch
+    similarity_matrix = torch.mm(normalized_embeddings, normalized_embeddings.T)
+
+    hard_negatives_indices = []
+    hard_negative_embeddings = []
+
+    for i in range(batch_size):
+        # Extract label and similarity scores for the current example
+        current_label = labels[i]
+        current_similarities = similarity_matrix[i]
+
+        # Exclude self from similarity scores
+        current_similarities[i] = -float('inf')  # Ensure self-similarity is not selected
+
+        # Get indices of samples with different labels (negative examples)
+        negative_mask = (labels != current_label)
+
+        # Filter similarity scores for negative examples
+        negative_similarities = current_similarities[negative_mask]
+        negative_indices = torch.arange(batch_size).to(device)[negative_mask]
+
+        # Select the top-k most similar negatives
+        if len(negative_similarities) > 0:
+            top_k_negatives = torch.topk(negative_similarities, min(top_k, len(negative_similarities))).indices
+            selected_negatives = negative_indices[top_k_negatives].tolist()
+        else:
+            selected_negatives = []
+
+        hard_negatives_indices.append(selected_negatives)
+        hard_negative_embeddings.append(embeddings[selected_negatives] if selected_negatives else torch.empty(0, embeddings.size(1)))
+
+    hard_negatives_batch = torch.cat(hard_negative_embeddings, dim=0)
+
+    return hard_negatives_batch
+
+
+def run_metric_adaptive_classification_training(
+    cfg: SimpleNamespace,
+    model: Model,
+    sentence_model: nn.Module,
+    train_dataset: Dataset,
+    test_dataset: Dataset,
+    val_dataset: Dataset,
+    tokenizer,  # TODO: define type
+    device: torch.device,
+):
+    sentence_preprocessor = SentenceTokenizationPreprocessor(tokenizer=tokenizer, max_len=cfg.dataset.max_len)
+
+    train_triplets_dataset = RelationWithDescriptionDataset(
+        train_dataset, desc_preprocessor=sentence_preprocessor
+    )
+    test_triplets_dataset = RelationWithDescriptionDataset(
+        test_dataset, desc_preprocessor=sentence_preprocessor
+    )
+    val_triplets_dataset = RelationWithDescriptionDataset(
+        val_dataset, desc_preprocessor=sentence_preprocessor
+    )
+
+    train_loader = DataLoader(
+        dataset=train_triplets_dataset,
+        batch_size=cfg.train.batch_size,
+        shuffle=True,
+        collate_fn=RelationWithDescriptionDataset.collate_data,
+    )
+    val_loader = DataLoader(  # TODO: replace with test_loader
+        dataset=test_triplets_dataset,
+        batch_size=cfg.train.eval_batch_size,
+        shuffle=False,
+        collate_fn=RelationWithDescriptionDataset.collate_data,
+    )
+    # val_loader = DataLoader(
+    #     dataset=val_triplets_dataset,
+    #     batch_size=cfg.train.eval_batch_size,
+    #     shuffle=False,
+    #     collate_fn=RelationWithDescriptionDataset.collate_data,
+    # )
+
+    criterion = TripletClassificationCosineMarginLoss(margin=cfg.train.triplet_margin)  # TODO: add alpha parameter
+    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.train.learning_rate)
+
+    global_steps_count = 0
+    steps_per_epoch = len(train_loader)
+
+    losses: List[float] = []
+    # Training loop
+    # -------------
+    for epoch in range(cfg.train.num_epochs):
+        logging.info('========')
+        logging.info(f'EPOCH {epoch + 1}')
+        logging.info('========')
+
+        running_loss: float = 0.0
+        steps_count: int = 0
+        for batch in train_loader:
+            global_steps_count += 1
+            steps_count += 1
+
+            model.train()
+
+            batch = tuple(t.to(device) for t in batch)
+
+            inputs_relation = {
+                'input_ids': batch[0],
+                'attention_mask': batch[1],
+                'token_type_ids': batch[2],
+                'e1_mask': batch[3],
+                'e2_mask': batch[4],
+            }
+            labels = batch[5]
+            inputs_description = {
+                'input_ids': batch[6],
+                'attention_mask': batch[7],
+            }
+            
+
+            logits, anchor_embeddings = model(**inputs_relation)
+            desc_embeddings = sentence_model(**inputs_description)[1]  # pooled output
+
+            negative_embeddings = select_hard_negatives(anchor_embeddings, labels, device, margin=0.5, top_k=1)
+
+            loss = criterion(anchor_embeddings, desc_embeddings, negative_embeddings, logits, labels)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+            avg_loss = running_loss / steps_count
+            losses.append(avg_loss)
+
+            if steps_count % cfg.general.log_frequency == 0:
+                logging.info(
+                    'Epoch {:^3} Step {:^5} --- '
+                    'Average loss (over {:^5} training steps out of {}): {:.5f}'.format(
+                        epoch + 1,
+                        global_steps_count,
+                        steps_count,
+                        steps_per_epoch,
+                        running_loss / steps_count,
+                    )
+                )
+
+            losses_plot_file_name = 'loss_plot_{}.png'.format(Path(cfg.dataset.path).name.lower().replace(' ', '_'))
+            losses_plot_file_path = PROJECT_PATH / cfg.general.output_dir / 'plots' / losses_plot_file_name
+            plot_loss_history(losses=losses, output_file_path=losses_plot_file_path)
+
+            # Calculate metrics on the validation set
+            if steps_count % cfg.train.eval_frequency == 0 or steps_count % len(train_loader) == 0:
+                val_result = eval_zero_shot_model(
+                    model,
+                    sentence_model,
                     device,
                     val_loader,
                     relations=test_dataset.relations_encoding,

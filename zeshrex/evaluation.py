@@ -13,6 +13,63 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from zeshrex.model import Model
+import torch.nn.functional as F
+
+
+def select_hard_negatives(embeddings, labels, device, margin=0.5, top_k=3):
+    """
+    Selects hard negatives within a batch based on cosine similarity.
+    
+    Args:
+        embeddings (torch.Tensor): Tensor of shape [batch_size, embedding_dim].
+        labels (torch.Tensor): Tensor of shape [batch_size], true labels for the batch.
+        margin (float): Minimum margin for cosine similarity to qualify as hard negative.
+        top_k (int): Number of hard negatives to select for each example.
+    
+    Returns:
+        hard_negatives_indices (list): A list of lists, where each sublist contains
+                                       indices of hard negatives for the corresponding
+                                       batch element.
+    """
+    batch_size = embeddings.size(0)
+    # Normalize embeddings for cosine similarity
+    normalized_embeddings = F.normalize(embeddings, p=2, dim=1)
+
+    # Compute cosine similarity between all pairs in the batch
+    similarity_matrix = torch.mm(normalized_embeddings, normalized_embeddings.T)
+
+    hard_negatives_indices = []
+    hard_negative_embeddings = []
+
+    for i in range(batch_size):
+        # Extract label and similarity scores for the current example
+        current_label = labels[i]
+        current_similarities = similarity_matrix[i]
+
+        # Exclude self from similarity scores
+        current_similarities[i] = -float('inf')  # Ensure self-similarity is not selected
+
+        # Get indices of samples with different labels (negative examples)
+        negative_mask = (labels != current_label)
+
+        # Filter similarity scores for negative examples
+        negative_similarities = current_similarities[negative_mask]
+        negative_indices = torch.arange(batch_size).to(device)[negative_mask]
+
+        # Select the top-k most similar negatives
+        if len(negative_similarities) > 0:
+            top_k_negatives = torch.topk(negative_similarities, min(top_k, len(negative_similarities))).indices
+            selected_negatives = negative_indices[top_k_negatives].tolist()
+        else:
+            selected_negatives = []
+
+        hard_negatives_indices.append(selected_negatives)
+        hard_negative_embeddings.append(embeddings[selected_negatives] if selected_negatives else torch.empty(0, embeddings.size(1)))
+
+    hard_negatives_batch = torch.cat(hard_negative_embeddings, dim=0)
+
+    return hard_negatives_batch
+
 
 
 def viz_clusters(dataset, labels, cluster_centers):
@@ -97,6 +154,7 @@ def visualize_clusters(
 
 def eval_zero_shot_model(
         model: Model,
+        sentence_model: nn.Module,
         device: torch.device,
         dataloader: DataLoader,
         relations: Dict[str, int],
@@ -112,42 +170,27 @@ def eval_zero_shot_model(
     for step, batch in enumerate(dataloader):
         batch = tuple(t.to(device) for t in batch)
 
-        inputs = {
-            'anchor_input_ids': batch[0],
-            'anchor_attention_mask': batch[1],
-            'anchor_token_type_ids': batch[2],
-            'anchor_e1_mask': batch[3],
-            'anchor_e2_mask': batch[4],
-            
-            'pos_input_ids': batch[5],
-            'pos_attention_mask': batch[6],
-            # 'pos_token_type_ids': None,
-            # 'pos_e1_mask': None,
-            # 'pos_e2_mask': None,
-
-            'pos_token_type_ids': batch[7],
-            'pos_e1_mask': batch[8],
-            'pos_e2_mask': batch[9],
-            
-            'neg_input_ids': batch[10],
-            'neg_attention_mask': batch[11],
-            'neg_token_type_ids': batch[12],
-            'neg_e1_mask': batch[13],
-            'neg_e2_mask': batch[14],
-            # 'labels': batch[15],
-            'desc_input_ids': batch[16],
-            'desc_attention_mask': batch[17],
+        inputs_relation = {
+            'input_ids': batch[0],
+            'attention_mask': batch[1],
+            'token_type_ids': batch[2],
+            'e1_mask': batch[3],
+            'e2_mask': batch[4],
         }
-        labels = batch[15]
+        labels = batch[5]
+        inputs_description = {
+            'input_ids': batch[6],
+            'attention_mask': batch[7],
+        }
 
         with torch.no_grad():
-            # anchor_embeddings, positive_embeddings, negative_embeddings = model(**inputs)
-            # loss = criterion(anchor_embeddings, positive_embeddings, negative_embeddings)
+            logits, anchor_embeddings = model(**inputs_relation)
+            desc_embeddings = sentence_model(**inputs_description)[1]  # pooled output
 
-            anchor_embeddings, positive_embeddings, negative_embeddings, desc_embeddings, logits = model(**inputs)
+            negative_embeddings = select_hard_negatives(anchor_embeddings, labels, device, margin=0.5, top_k=1)
+
             loss = criterion(anchor_embeddings, desc_embeddings, negative_embeddings, logits, labels)
 
-            # labels_arr = inputs['labels'].cpu().detach().numpy()
             labels_arr = labels.cpu().detach().numpy()
 
             embeddings_batch_arr = anchor_embeddings.cpu().detach().numpy()
