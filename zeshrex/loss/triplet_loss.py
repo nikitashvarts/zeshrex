@@ -25,14 +25,14 @@ class TripletClassificationCosineMarginLoss:
 
         self._classification_criterion = nn.CrossEntropyLoss()
 
-    def __call__(self, anchor_embeddings, positive_embeddings, negative_embeddings, logits, labels: Optional[torch.Tensor] = None):
+    def __call__(self, anchor_embeddings, positive_embeddings, negative_embeddings, logits: Optional[torch.Tensor] = None, labels: Optional[torch.Tensor] = None):
         cos = nn.CosineSimilarity()
         pos_similarity = cos(anchor_embeddings, positive_embeddings)
         neg_similarity = cos(anchor_embeddings, negative_embeddings)
 
         triplet_loss = nn.functional.relu(self._margin + neg_similarity - pos_similarity).mean()
 
-        if labels is not None:
+        if logits is not None:
             classification_loss = self._classification_criterion(logits, labels)
         else:
             classification_loss = 0

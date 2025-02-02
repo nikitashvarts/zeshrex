@@ -85,6 +85,7 @@ def eval_metric_classification_model(
     relation_labels: Dict[str, int],
     relation_descriptions_tokens: Dict[str, Tuple[List[int], List[int]]],
     criterion: nn.Module,
+    use_zero_shot: bool,
     output_dir: Optional[os.PathLike] = None,
     tag: Optional[str] = None,
 ):
@@ -134,6 +135,9 @@ def eval_metric_classification_model(
             desc_embeddings = sentence_model(**inputs_description)[1]  # pooled output
 
             negative_embeddings = select_hard_negatives(anchor_embeddings, labels, device, margin=0.5, top_k=1)
+
+            if use_zero_shot:
+                logits = None
 
             loss = criterion(anchor_embeddings, desc_embeddings, negative_embeddings, logits, labels)
 

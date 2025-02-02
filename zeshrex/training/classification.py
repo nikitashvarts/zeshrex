@@ -40,13 +40,14 @@ def run_classification_training(
     global_steps_count = 0
     steps_per_epoch = len(train_loader)
 
-    losses: List[float] = []
     # Training loop
     # -------------
     for epoch in range(cfg.train.num_epochs):
         logging.info('========')
         logging.info(f'EPOCH {epoch + 1}')
         logging.info('========')
+
+        losses: List[float] = []
 
         running_loss: float = 0.0
         steps_count: int = 0
@@ -92,7 +93,7 @@ def run_classification_training(
                 )
 
             dataset_name = Path(cfg.dataset.path).name.lower().replace(' ', '_')
-            losses_plot_file_name = 'loss_plot_{}_{}epoch.png'.format(dataset_name, epoch)
+            losses_plot_file_name = 'loss_plot_{}_{}epoch.png'.format(dataset_name, epoch+1)
             losses_plot_file_path = PROJECT_PATH / cfg.general.output_dir / 'plots' / losses_plot_file_name
             plot_loss_history(losses=losses, output_file_path=losses_plot_file_path)
 

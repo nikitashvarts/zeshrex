@@ -42,13 +42,14 @@ def run_triplet_classification_adaptive_training(
     global_steps_count = 0
     steps_per_epoch = len(train_loader)
 
-    losses: List[float] = []
     # Training loop
     # -------------
     for epoch in range(cfg.train.num_epochs):
         logging.info('========')
         logging.info(f'EPOCH {epoch + 1}')
         logging.info('========')
+
+        losses: List[float] = []
 
         running_loss: float = 0.0
         steps_count: int = 0
@@ -103,7 +104,7 @@ def run_triplet_classification_adaptive_training(
                 )
 
             dataset_name = Path(cfg.dataset.path).name.lower().replace(' ', '_')
-            losses_plot_file_name = 'loss_plot_{}_{}epoch.png'.format(dataset_name, epoch)
+            losses_plot_file_name = 'loss_plot_{}_{}epoch.png'.format(dataset_name, epoch+1)
             losses_plot_file_path = PROJECT_PATH / cfg.general.output_dir / 'plots' / losses_plot_file_name
             plot_loss_history(losses=losses, output_file_path=losses_plot_file_path)
 
@@ -115,9 +116,10 @@ def run_triplet_classification_adaptive_training(
                     sentence_model=sentence_model,
                     device=device,
                     dataloader=test_loader,
-                    relation_labels=test_dataset.relations_encoding,
+                    relation_labels=test_dataset.relations_encoding,  # TODO: make option for Generalized ZSL
                     relation_descriptions_tokens=test_dataset.relation_descriptions_tokens,
                     criterion=criterion,
+                    use_zero_shot=cfg.dataset.use_zero_shot_split,
                     output_dir=PROJECT_PATH / 'output' / 'viz',  # TODO: make a param
                     tag=f'{dataset_name}_{global_steps_count}steps',
                 )

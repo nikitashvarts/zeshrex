@@ -9,7 +9,7 @@ general:
 train:
   criterion: TripletClassificationLoss  # ['CrossEntropyLoss', 'TripletLoss', 'TripletClassificationLoss']
   batch_size: 50
-  num_epochs: 2
+  num_epochs: 3
   weight_decay: 0.1
   learning_rate: 1.0e-5  # The initial learning rate for Adam.
   warmup_steps: 500
@@ -28,5 +28,5 @@ model:
 dataset:
   path: ./datasets/prepared/WebNLG/
   max_len: 300
-  use_predefined_split: True
-  use_zero_shot_split: False
+  use_predefined_split: False
+  use_zero_shot_split: True

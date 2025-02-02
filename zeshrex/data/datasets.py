@@ -284,11 +284,15 @@ class RelationWithDescriptionDataset(Dataset):
         self._dataset_name = data._dataset_name
         self._desc_preprocessor = desc_preprocessor
 
+        self._label_to_relation = {v: k for k, v in self._data._relation_to_label.items()}
+
         self._relation_to_desc = load_relation_names(
             PROJECT_PATH / 'datasets' / 'raw' / self._dataset_name / 'relation_names_top.tsv'
         )
+        self._relation_to_desc = {
+            rel: desc for rel, desc in self._relation_to_desc.items() if rel in list(self._label_to_relation.values())
+        }
         self._relation_to_desc_tokens = self._preprocess_descriptions(self._relation_to_desc)
-        self._label_to_relation = {v: k for k, v in self._data._relation_to_label.items()}
 
         self._dataset = self._connect_samples_with_description(data)
 
