@@ -8,16 +8,16 @@ general:
 
 train:
   criterion: TripletClassificationLoss  # ['CrossEntropyLoss', 'TripletLoss', 'TripletClassificationLoss']
-  batch_size: 16
-  num_epochs: 5
+  batch_size: 50
+  num_epochs: 2
   weight_decay: 0.1
   learning_rate: 1.0e-5  # The initial learning rate for Adam.
   warmup_steps: 500
   adam_epsilon: 1.0e-6  # Epsilon for Adam optimizer.
   max_grad_norm: 1.0  # Max gradient norm.
   gradient_accumulation_steps: 1  # Number of updates steps to accumulate before performing a backward/update pass
-  eval_frequency: 500
-  eval_batch_size: 32
+  eval_frequency: 100
+  eval_batch_size: 100
   triplet_margin: 0.5
 
 model:

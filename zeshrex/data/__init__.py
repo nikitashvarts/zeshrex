@@ -1,7 +1,20 @@
 from typing import Union
 
-from .datasets import RelationDataset
+from .datasets import (
+    RelationDataset,
+    RelationTripletsDataset,
+    RelationWithDescriptionDataset,
+)
 
-Dataset = Union[RelationDataset]
+Dataset = Union[
+    RelationDataset,
+    RelationWithDescriptionDataset,
+    RelationTripletsDataset,
+]
 
-__all__ = [Dataset, RelationDataset]
+__all__ = [
+    Dataset,
+    RelationDataset,
+    RelationWithDescriptionDataset,
+    RelationTripletsDataset,
+]

@@ -3,13 +3,14 @@ import logging
 import os
 import random
 from pathlib import Path
-from typing import List, Dict, Tuple, Any, Iterable, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
+from datasets.preprocessing.common import load_relation_names
 from zeshrex import PROJECT_PATH
 from zeshrex.data.preprocessing import BasePreprocessor
 
@@ -20,14 +21,17 @@ DataIndex = Optional[List[int]]
 
 class RelationDataset(Dataset):
     def __init__(
-            self,
-            data: Data,
-            relations: List[str],
-            indexes: Optional[Tuple[DataIndex, DataIndex, DataIndex]] = None,
-            text_processor: Optional[BasePreprocessor] = None,
-            limit: Optional[int] = None,  # TODO: remove
+        self,
+        data: Data,
+        dataset_name: str,
+        relations: List[str],
+        indexes: Optional[Tuple[DataIndex, DataIndex, DataIndex]] = None,
+        text_processor: Optional[BasePreprocessor] = None,
+        limit: Optional[int] = None,  # TODO: remove debug
     ) -> None:
         self._dataset = data
+        self._dataset_name = dataset_name
+
         if limit is not None:  # TODO: remove debug
             self._dataset = data[:limit]
 
@@ -56,7 +60,7 @@ class RelationDataset(Dataset):
 
     @classmethod
     def from_directory(
-            cls, dir_path: os.PathLike, text_processor: Optional[BasePreprocessor] = None
+        cls, dir_path: os.PathLike, text_processor: Optional[BasePreprocessor] = None
     ) -> 'RelationDataset':
         _DATA_FILE_NAME = 'data.tsv'
         _INDEX_FILE_NAME_TEMPLATE = '{}_index.txt'
@@ -72,8 +76,14 @@ class RelationDataset(Dataset):
             [len(idx) if idx is not None else 0 for idx in (train_index, test_index, val_index)]
         ), 'Lengths of data and all indexes are not equal! Check consistency of your data!'
 
+        dataset_name = Path(dir_path).name
+
         return cls(
-            data=data, indexes=(train_index, test_index, val_index), relations=relations, text_processor=text_processor
+            data=data,
+            dataset_name=dataset_name,
+            indexes=(train_index, test_index, val_index),
+            relations=relations,
+            text_processor=text_processor,
         )
 
     @property
@@ -91,7 +101,9 @@ class RelationDataset(Dataset):
         return self._relation_to_label.copy()
 
     def generate_train_test_split(
-            self, use_predefined_split: bool = False, use_zero_shot_split: bool = False,
+        self,
+        use_predefined_split: bool = False,
+        use_zero_shot_split: bool = False,
     ) -> Tuple['RelationDataset', 'RelationDataset', 'RelationDataset']:
         if use_predefined_split:
             logging.info('Generating split according to provided train / test / val indexes')
@@ -102,6 +114,23 @@ class RelationDataset(Dataset):
         else:
             logging.info('Generating simple random train / test / val split')
             raise NotImplementedError('Simple random split is not defined yet!')  # TODO: implement random split
+
+    @staticmethod
+    def collate_data(batch: List[Tuple[Tuple[Iterable, ...], int]]) -> List[torch.Tensor]:
+        collated_data: Dict[int, List[List[Any]]] = {}
+        collated_labels: List[int] = []
+        for data, label in batch:
+            for index, item in enumerate(data):
+                collated_data[index] = collated_data.get(index, []) + [list(item)]
+            collated_labels.append(label)
+
+        collated_tensors: List[torch.Tensor] = []
+        for collated_items in collated_data.values():
+            collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
+
+        collated_tensors.append(torch.tensor(collated_labels, dtype=torch.long))
+
+        return collated_tensors
 
     def _generate_predefined_split(self):
         relations = list(self._relation_to_label.keys())
@@ -125,24 +154,27 @@ class RelationDataset(Dataset):
 
         split = (
             RelationDataset(
-                split_data.get('train', []),
-                relations,
-                (self._train_index, None, None),
-                self._text_processor,
+                data=split_data.get('train', []),
+                dataset_name=self._dataset_name,
+                relations=relations,
+                indexes=(self._train_index, None, None),
+                text_processor=self._text_processor,
                 # limit=1000,  # TODO: remove debug
             ),
             RelationDataset(
-                split_data.get('test', []),
-                relations,
-                (None, self._test_index, None),
-                self._text_processor,
+                data=split_data.get('test', []),
+                dataset_name=self._dataset_name,
+                relations=relations,
+                indexes=(None, self._test_index, None),
+                text_processor=self._text_processor,
                 # limit=300,  # TODO: remove debug
             ),
             RelationDataset(
-                split_data.get('val', []),
-                relations,
-                (None, None, self._val_index),
-                self._text_processor,
+                data=split_data.get('val', []),
+                dataset_name=self._dataset_name,
+                relations=relations,
+                indexes=(None, None, self._val_index),
+                text_processor=self._text_processor,
                 # limit=300,  # TODO: remove debug
             ),
         )
@@ -151,6 +183,7 @@ class RelationDataset(Dataset):
 
     def _generate_zero_shot_split(self, unseen_classes_ratio: float = 0.3, seed: Optional[int] = None):
         relations = list(self._relation_to_label.keys())
+        
         rng = np.random.RandomState(seed)  # create a separate state not to break the main one for reproducibility
         unseen_relations = set(rng.choice(relations, size=int(len(relations) * unseen_classes_ratio), replace=False))
         seen_relations = set(rel for rel in relations if rel not in unseen_relations)
@@ -176,24 +209,27 @@ class RelationDataset(Dataset):
 
         split = (
             RelationDataset(
-                split_data.get('train', []),
-                list(seen_relations),
-                (split_indexes.get('train', []), None, None),
-                self._text_processor,
+                data=split_data.get('train', []),
+                dataset_name=self._dataset_name,
+                relations=list(seen_relations),
+                indexes=(split_indexes.get('train', []), None, None),
+                text_processor=self._text_processor,
                 # limit=1000,  # TODO: remove debug
             ),
             RelationDataset(
-                split_data.get('test', []),
-                list(unseen_relations),
-                (None, split_indexes.get('test', []), None),
-                self._text_processor,
+                data=split_data.get('test', []),
+                dataset_name=self._dataset_name,
+                relations=list(unseen_relations),
+                indexes=(None, split_indexes.get('test', []), None),
+                text_processor=self._text_processor,
                 # limit=300,  # TODO: remove debug
             ),
             RelationDataset(
-                split_data.get('val', []),
-                [],  # TODO: support relations for validation
-                (None, None, []),
-                self._text_processor,
+                data=split_data.get('val', []),
+                dataset_name=self._dataset_name,
+                relations=[],  # TODO: support relations for validation
+                indexes=(None, None, []),
+                text_processor=self._text_processor,
                 # limit=300,  # TODO: remove debug
             ),
         )
@@ -238,24 +274,102 @@ class RelationDataset(Dataset):
         return relation_to_label
 
 
-class TripletsRelationDataset(Dataset):
+class RelationWithDescriptionDataset(Dataset):
     def __init__(
-            self,
-            data: RelationDataset,
-            triplets_per_sample: int = 5,
-            desc_preprocessor: Optional[BasePreprocessor] = None,
+        self,
+        data: RelationDataset,
+        desc_preprocessor: Optional[BasePreprocessor] = None,
+    ):
+        self._data = data
+        self._dataset_name = data._dataset_name
+        self._desc_preprocessor = desc_preprocessor
+
+        self._relation_to_desc = load_relation_names(
+            PROJECT_PATH / 'datasets' / 'raw' / self._dataset_name / 'relation_names_top.tsv'
+        )
+        self._relation_to_desc_tokens = self._preprocess_descriptions(self._relation_to_desc)
+        self._label_to_relation = {v: k for k, v in self._data._relation_to_label.items()}
+
+        self._dataset = self._connect_samples_with_description(data)
+
+    def __len__(self):
+        return len(self._dataset)
+
+    def __getitem__(self, index: int) -> Tuple[Tuple[Any, Any, Any], int, Any]:
+        return self._dataset[index]
+
+    @property
+    def relations_encoding(self) -> Optional[Dict[str, int]]:
+        if self._data._relation_to_label is None:
+            logging.warning('Relation have not been defined yet!')
+            return None
+        return self._data._relation_to_label.copy()
+
+    @property
+    def relation_descriptions_tokens(self) -> Optional[Dict[str, Tuple[List[int], List[int]]]]:
+        if self._relation_to_desc_tokens is None:
+            logging.warning('Relation have not been defined yet!')
+            return None
+        return self._relation_to_desc_tokens.copy()
+
+    @staticmethod
+    def collate_data(batch) -> List[torch.Tensor]:
+        collated_data = {}
+        collated_labels = []
+        collated_desc = {}
+        for data, label, desc in batch:
+            for index, item in enumerate(data):
+                collated_data[index] = collated_data.get(index, []) + [list(item)]
+            collated_labels.append(label)
+            for index, item in enumerate(desc):
+                collated_desc[index] = collated_desc.get(index, []) + [list(item)]
+
+        collated_tensors: List[torch.Tensor] = []
+        for collated_items in collated_data.values():
+            collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
+
+        collated_tensors.append(torch.tensor(collated_labels, dtype=torch.long))
+
+        for collated_items in collated_desc.values():
+            collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
+
+        return collated_tensors
+
+    def _preprocess_descriptions(self, relation_to_desc: Dict[str, str]) -> Dict[str, Tuple[List[int], List[int]]]:
+        return {
+            relation: self._desc_preprocessor(desc_text)
+            for relation, desc_text in relation_to_desc.items()
+        }
+        
+    def _connect_samples_with_description(
+        self,
+        data: RelationDataset,
+    ):
+        logging.info('Connecting samples with descriptions')
+        samples_with_desc: List[Tuple[Any, Any, Any]] = []
+
+        for sample, relation in tqdm(data):
+            desc_tokens = self._relation_to_desc_tokens[self._label_to_relation[relation]]
+            samples_with_desc.append((sample, relation, desc_tokens))
+
+        return samples_with_desc
+
+
+class RelationTripletsDataset(Dataset):
+    def __init__(
+        self,
+        data: RelationDataset,
+        triplets_per_sample: int = 5,
+        desc_preprocessor: Optional[BasePreprocessor] = None,
     ) -> None:
+        self._data = data
         self._triplets_per_sample = triplets_per_sample
 
-        # -------------------------------------------------------
-        from datasets.preprocessing.common import load_relation_names
         self.relation_to_desc = load_relation_names(
-            PROJECT_PATH / 'datasets' / 'raw' / 'WebNLG' / 'relation_names_top.tsv'
+            PROJECT_PATH / 'datasets' / 'raw' / self._dataset_name / 'relation_names_top.tsv'
         )
 
-        self.data = data
-        self.label_to_relation = {v: k for k, v in self.data._relation_to_label.items()}
-        # -------------------------------------------------------
+        self.label_to_relation = {v: k for k, v in self._data._relation_to_label.items()}
 
         self._desc_preprocessor = desc_preprocessor
         self._dataset = self._make_positive_negative_triplets(data)
@@ -266,9 +380,32 @@ class TripletsRelationDataset(Dataset):
     def __getitem__(self, index: int) -> Tuple[Tuple[Any, Any, Any], int, Any]:
         return self._dataset[index]
 
+    @staticmethod
+    def collate_data(batch: List[Tuple[Tuple[Iterable, ...], int]]) -> List[torch.Tensor]:
+        collated_data: Dict[int, List[List[Any]]] = {}
+        collated_labels: List[int] = []
+        collated_desc: Dict[int, Any] = {}
+        for data, label, desc in batch:
+            for index, item in enumerate(data):
+                collated_data[index] = collated_data.get(index, []) + [list(item)]
+            collated_labels.append(label)
+            for index, item in enumerate(desc):
+                collated_desc[index] = collated_desc.get(index, []) + [list(item)]
+
+        collated_tensors: List[torch.Tensor] = []
+        for collated_items in collated_data.values():
+            collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
+
+        collated_tensors.append(torch.tensor(collated_labels, dtype=torch.long))
+
+        for collated_items in collated_desc.values():
+            collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
+
+        return collated_tensors
+
     def _make_positive_negative_triplets(
-            self,
-            data: RelationDataset,
+        self,
+        data: RelationDataset,
     ) -> List[Tuple[Tuple[Any, Any, Any], int, Any]]:
         logging.info('Making positive and negative triplets from data')
         triplets: List[Tuple[Tuple[Any, Any, Any], int, Any]] = []
@@ -298,43 +435,3 @@ class TripletsRelationDataset(Dataset):
 
         assert len(triplets) == self._triplets_per_sample * len(data), 'Wrong amount of generated triplets!'
         return triplets
-
-
-def collate_data(batch: List[Tuple[Tuple[Iterable, ...], int]]) -> List[torch.Tensor]:
-    collated_data: Dict[int, List[List[Any]]] = {}
-    collated_labels: List[int] = []
-    for data, label in batch:
-        for index, item in enumerate(data):
-            collated_data[index] = collated_data.get(index, []) + [list(item)]
-        collated_labels.append(label)
-
-    collated_tensors: List[torch.Tensor] = []
-    for collated_items in collated_data.values():
-        collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
-
-    collated_tensors.append(torch.tensor(collated_labels, dtype=torch.long))
-
-    return collated_tensors
-
-
-def collate_data_triplets(batch: List[Tuple[Tuple[Iterable, ...], int]]) -> List[torch.Tensor]:
-    collated_data: Dict[int, List[List[Any]]] = {}
-    collated_labels: List[int] = []
-    collated_desc: Dict[int, Any] = {}
-    for data, label, desc in batch:
-        for index, item in enumerate(data):
-            collated_data[index] = collated_data.get(index, []) + [list(item)]
-        collated_labels.append(label)
-        for index, item in enumerate(desc):
-            collated_desc[index] = collated_desc.get(index, []) + [list(item)]
-
-    collated_tensors: List[torch.Tensor] = []
-    for collated_items in collated_data.values():
-        collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
-
-    collated_tensors.append(torch.tensor(collated_labels, dtype=torch.long))
-
-    for collated_items in collated_desc.values():
-        collated_tensors.append(torch.tensor(collated_items, dtype=torch.long))
-
-    return collated_tensors
