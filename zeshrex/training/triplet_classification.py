@@ -104,7 +104,9 @@ def run_triplet_classification_adaptive_training(
                 )
 
             dataset_name = Path(cfg.dataset.path).name.lower().replace(' ', '_')
-            losses_plot_file_name = 'loss_plot_{}_{}epoch.png'.format(dataset_name, epoch+1)
+            zsl_tag = 'ZSL' if cfg.dataset.use_zero_shot_split else 'noZSL'
+
+            losses_plot_file_name = f'loss_plot_{dataset_name}_{zsl_tag}_{epoch+1}epoch.png'
             losses_plot_file_path = PROJECT_PATH / cfg.general.output_dir / 'plots' / losses_plot_file_name
             plot_loss_history(losses=losses, output_file_path=losses_plot_file_path)
 
@@ -121,7 +123,7 @@ def run_triplet_classification_adaptive_training(
                     criterion=criterion,
                     use_zero_shot=cfg.dataset.use_zero_shot_split,
                     output_dir=PROJECT_PATH / 'output' / 'viz',  # TODO: make a param
-                    tag=f'{dataset_name}_{global_steps_count}steps',
+                    tag=f'{dataset_name}_{zsl_tag}_{global_steps_count}steps',
                 )
                 logging.info('-----------------------')
                 logging.info(f"Epoch {epoch + 1}/{cfg.train.num_epochs}, Loss: {running_loss / len(train_loader):.4f}")

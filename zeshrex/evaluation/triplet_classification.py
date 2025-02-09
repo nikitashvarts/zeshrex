@@ -139,9 +139,9 @@ def eval_metric_classification_model(
             if use_zero_shot:
                 logits = None
 
-            loss = criterion(anchor_embeddings, desc_embeddings, negative_embeddings, logits, labels)
-
-            running_loss += loss.item()
+            if len(negative_embeddings) != 0:
+                loss = criterion(anchor_embeddings, desc_embeddings, negative_embeddings, logits, labels)
+                running_loss += loss.item()  # TODO: be careful with updating it under IF section
 
             labels_arr = labels.cpu().detach().numpy()
             embeddings_batch_arr = anchor_embeddings.cpu().detach().numpy()

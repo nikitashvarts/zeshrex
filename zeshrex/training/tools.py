@@ -70,7 +70,7 @@ def select_hard_negatives(embeddings, labels, device, margin=0.5, top_k=3):
 
         hard_negatives_indices.append(selected_negatives)
         hard_negative_embeddings.append(
-            embeddings[selected_negatives] if selected_negatives else torch.empty(0, embeddings.size(1))
+            embeddings[selected_negatives] if selected_negatives else torch.empty(0, embeddings.size(1)).to(device)
         )
 
     hard_negatives_batch = torch.cat(hard_negative_embeddings, dim=0)

@@ -188,7 +188,12 @@ class RelationDataset(Dataset):
         unseen_relations = set(rng.choice(relations, size=int(len(relations) * unseen_classes_ratio), replace=False))
         seen_relations = set(rel for rel in relations if rel not in unseen_relations)
 
-        unseen_relations = set(['ethnicGroup', 'creator', 'language', 'number'])
+        # WebNLG Predefined
+        # unseen_relations = set(['ethnicGroup', 'creator', 'language', 'number'])
+        
+        # NYT Predefined
+        unseen_relations = set(['country', 'company', 'place_lived'])
+
         seen_relations = set(rel for rel in relations if rel not in unseen_relations)
 
         split_data: Dict[str, Data] = {}
@@ -287,7 +292,7 @@ class RelationWithDescriptionDataset(Dataset):
         self._label_to_relation = {v: k for k, v in self._data._relation_to_label.items()}
 
         self._relation_to_desc = load_relation_names(
-            PROJECT_PATH / 'datasets' / 'raw' / self._dataset_name / 'relation_names_top.tsv'
+            PROJECT_PATH / 'datasets' / 'prepared' / self._dataset_name / 'relation_names.tsv'
         )
         self._relation_to_desc = {
             rel: desc for rel, desc in self._relation_to_desc.items() if rel in list(self._label_to_relation.values())
@@ -370,7 +375,7 @@ class RelationTripletsDataset(Dataset):
         self._triplets_per_sample = triplets_per_sample
 
         self.relation_to_desc = load_relation_names(
-            PROJECT_PATH / 'datasets' / 'raw' / self._dataset_name / 'relation_names_top.tsv'
+            PROJECT_PATH / 'datasets' / 'prepared' / self._dataset_name / 'relation_names.tsv'
         )
 
         self.label_to_relation = {v: k for k, v in self._data._relation_to_label.items()}
