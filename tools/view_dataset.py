@@ -18,7 +18,7 @@ def load_args():
         '-d',
         '--dataset_path',
         type=str,
-        default='./datasets/prepared/NEREL14/',
+        default='./datasets/prepared/WebNLG/',
         help='Path to the directory containing the dataset files.',
     )
     parser.add_argument(

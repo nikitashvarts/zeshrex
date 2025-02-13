@@ -20,7 +20,7 @@ def load_args() -> Dict[str, Any]:
     parser.add_argument('--train_data', type=str, default='./train/')
     parser.add_argument('--test_data', type=str, default='./test/')
     parser.add_argument('--dev_data', type=str, default='./dev/')
-    parser.add_argument('--relation_names_file', type=str, default='./relation_names_top.tsv')
+    parser.add_argument('--relation_names_file', type=str, default='./relation_names_14.tsv')
     parser.add_argument('--output_dir', type=str, default='./datasets/prepared/NEREL/')
 
     return parser.parse_args().__dict__

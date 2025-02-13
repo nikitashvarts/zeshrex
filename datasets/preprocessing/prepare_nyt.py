@@ -23,7 +23,7 @@ def load_args() -> Dict[str, Any]:
     parser.add_argument('--train_file', type=str, default='./train.json')
     parser.add_argument('--test_file', type=str, default='./test.json')
     parser.add_argument('--val_file', type=str, default='./valid.json')
-    parser.add_argument('--relation_names_file', type=str, default='./relation_names_top.tsv')
+    parser.add_argument('--relation_names_file', type=str, default='./relation_names_16.tsv')
     parser.add_argument('--output_dir', type=str, default='./datasets/prepared/NYT/')
 
     return parser.parse_args().__dict__

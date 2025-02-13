@@ -20,7 +20,7 @@ def load_args() -> Dict[str, Any]:
     parser.add_argument('--train_data', type=str, default='./xml/train/')
     parser.add_argument('--test_data', type=str, default='./xml/test/')
     parser.add_argument('--dev_data', type=str, default='./xml/dev/')
-    parser.add_argument('--relation_names_file', type=str, default='relation_names_filtered.tsv')
+    parser.add_argument('--relation_names_file', type=str, default='relation_names_12.tsv')
     parser.add_argument('--relation_aliases_file', type=str, default='relation_aliases.json')
     parser.add_argument('--output_dir', type=str, default='./datasets/prepared/WebNLG/')
 

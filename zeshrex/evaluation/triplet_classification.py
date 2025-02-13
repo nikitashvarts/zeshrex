@@ -146,7 +146,9 @@ def eval_metric_classification_model(
             labels_arr = labels.cpu().detach().numpy()
             embeddings_batch_arr = anchor_embeddings.cpu().detach().numpy()
 
-            total_preds.extend(find_closest_relation_labels(anchor_embeddings, label_to_relation_embedding))
+            preds_arr = find_closest_relation_labels(anchor_embeddings, label_to_relation_embedding)
+
+            total_preds.extend(preds_arr)
             total_labels.extend(labels.cpu().numpy())
 
         for label, embedding in zip(labels_arr, embeddings_batch_arr):

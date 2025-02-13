@@ -189,10 +189,13 @@ class RelationDataset(Dataset):
         seen_relations = set(rel for rel in relations if rel not in unseen_relations)
 
         # WebNLG Predefined
-        # unseen_relations = set(['ethnicGroup', 'creator', 'language', 'number'])
+        unseen_relations = set(['ethnicGroup', 'creator', 'language', 'number'])
         
         # NYT Predefined
-        unseen_relations = set(['country', 'company', 'place_lived'])
+        # unseen_relations = set(['country', 'company', 'place_lived'])
+
+        # NEREL Predefined
+        # unseen_relations = set(['PART_OF', 'AGE_IS', 'LOCATED_IN', 'POINT_IN_TIME'])
 
         seen_relations = set(rel for rel in relations if rel not in unseen_relations)
 
