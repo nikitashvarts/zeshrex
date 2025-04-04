@@ -25,6 +25,7 @@ class RelationModel(nn.Module):
         sequence_output = outputs[0]
         pooled_output = outputs[1]
 
+        token_type_ids = None
         if token_type_ids is None:
             relation_embeddings = torch.tanh(pooled_output)
             relation_embeddings = self._dropout(relation_embeddings)
@@ -32,19 +33,19 @@ class RelationModel(nn.Module):
             return relation_embeddings
 
         # Entities extraction
-        e1_h = self.extract_entity(sequence_output, e1_mask)
-        e2_h = self.extract_entity(sequence_output, e2_mask)
+        # e1_h = self.extract_entity(sequence_output, e1_mask)
+        # e2_h = self.extract_entity(sequence_output, e2_mask)
 
-        context = self._dropout(pooled_output)
+        # context = self._dropout(pooled_output)
 
-        pooled_output = torch.cat([context, e1_h, e2_h], dim=-1)
-        pooled_output = torch.tanh(pooled_output)
-        pooled_output = self._fclayer(pooled_output)
+        # pooled_output = torch.cat([context, e1_h, e2_h], dim=-1)
+        # pooled_output = torch.tanh(pooled_output)
+        # pooled_output = self._fclayer(pooled_output)
 
-        relation_embeddings = torch.tanh(pooled_output)
-        relation_embeddings = self._dropout(relation_embeddings)
+        # relation_embeddings = torch.tanh(pooled_output)
+        # relation_embeddings = self._dropout(relation_embeddings)
 
-        return relation_embeddings
+        # return relation_embeddings
 
     @staticmethod
     def extract_entity(sequence_output, e_mask):

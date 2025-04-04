@@ -93,7 +93,9 @@ def run_classification_training(
                 )
 
             dataset_name = Path(cfg.dataset.path).name.lower().replace(' ', '_')
-            losses_plot_file_name = 'loss_plot_{}_{}epoch.png'.format(dataset_name, epoch+1)
+            zsl_tag = 'ZSL' if cfg.dataset.use_zero_shot_split else 'noZSL'
+
+            losses_plot_file_name = f'loss_plot_{dataset_name}_{zsl_tag}_{epoch+1}epoch.png'
             losses_plot_file_path = PROJECT_PATH / cfg.general.output_dir / 'plots' / losses_plot_file_name
             plot_loss_history(losses=losses, output_file_path=losses_plot_file_path)
 
@@ -107,19 +109,16 @@ def run_classification_training(
                     relations=test_dataset.relations_encoding,
                     criterion=criterion,
                     output_dir=PROJECT_PATH / 'output' / 'viz',  # TODO: make a param
-                    tag=f'{dataset_name}_{global_steps_count}steps',
+                    tag=f'{dataset_name}_{zsl_tag}_{global_steps_count}steps',
                 )
+                logging.info('-----------------------')
                 logging.info(f"Epoch {epoch + 1}/{cfg.train.num_epochs}, Loss: {running_loss / len(train_loader):.4f}")
-                logging.info(
-                    'Validation Loss: {}, '
-                    'Precision: {}, Recall: {}, F1-score: {}, '
-                    'Avg Inner Dist: {}, Avg Outer Dict: {}'.format(
-                        metrics['eval_loss'],
-                        metrics['precision_macro'],
-                        metrics['recall_macro'],
-                        metrics['f1_score_macro'],
-                        metrics['avg_inner_distance'],
-                        metrics['avg_outer_distance'],
-                    )
-                )
-                logging.info('==========')
+                logging.info('-----------------------')
+                logging.info('Metrics Report')
+                logging.info('------------------------------------------------')
+                logging.info('| {:^30} | {:^11} |'.format('Metric', 'Value'))
+                logging.info('------------------------------------------------')
+                for metric_name, metric_value in metrics.items():
+                    logging.info('| {:^30} | {:^11.5f} |'.format(metric_name, metric_value))
+
+                logging.info('------------------------------------------------')

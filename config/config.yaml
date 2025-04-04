@@ -1,5 +1,5 @@
 general:
-  gpu: 0
+  gpu: 1
   seed: 42
   n_workers: 1
   models_output_dir: ./models/
@@ -7,9 +7,9 @@ general:
   log_frequency: 10
 
 train:
-  criterion: TripletClassificationLoss  # ['CrossEntropyLoss', 'TripletLoss', 'TripletClassificationLoss']
+  criterion: CrossEntropyLoss  # ['CrossEntropyLoss', 'TripletLoss', 'TripletClassificationLoss']
   batch_size: 32
-  num_epochs: 3
+  num_epochs: 2
   weight_decay: 0.1
   learning_rate: 1.0e-5  # The initial learning rate for Adam.
   warmup_steps: 500
@@ -21,12 +21,16 @@ train:
   triplet_margin: 0.5
 
 model:
-  name: intfloat/e5-large-v2  # ['intfloat/e5-base-v2', 'intfloat/e5-large-v2', 'intfloat/multilingual-e5-large', 'bert-base-cased', 'DeepPavlov/rubert-base-cased']
-  relation_embedding_size: 1024
+  name: intfloat/multilingual-e5-base  # ['intfloat/e5-base-v2', 'intfloat/e5-large-v2', 'intfloat/multilingual-e5-large', 'bert-base-cased', 'DeepPavlov/rubert-base-cased']
+  relation_embedding_size: 768
   dropout_rate: 0.1
 
 dataset:
-  path: ./datasets/prepared/WebNLG/
-  max_len: 200
-  use_predefined_split: True
-  use_zero_shot_split: False
+  path: ./datasets/prepared/NEREL/
+  max_len: 400
+  
+  # use_predefined_split: True
+  # use_zero_shot_split: False
+
+  use_predefined_split: False
+  use_zero_shot_split: True
