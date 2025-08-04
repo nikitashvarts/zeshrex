@@ -18,8 +18,8 @@ def load_args() -> Dict[str, Any]:
     parser = argparse.ArgumentParser('Script for SemEval2010 Task 8 dataset preparation')
 
     parser.add_argument('--data_dir', type=str, default='./datasets/raw/SciTextMiner/')
-    parser.add_argument('--train_file', type=str, default='trainset_ru_ner-re_it-ling-psy.csv')
-    parser.add_argument('--test_file', type=str, default='testset_ru_ner-re.csv')
+    parser.add_argument('--train_file', type=str, default='trainset_ru_ner-re_it-ling-med-psy.csv')
+    parser.add_argument('--test_file', type=str, default='testset_kz_ner-re.csv')
     parser.add_argument('--relation_names_file', type=str, default='relation_names.tsv')
     parser.add_argument('--output_dir', type=str, default='./datasets/prepared/SciTextMiner/')
 
@@ -141,7 +141,11 @@ def load_data(
 
                     first_arg_tag, sub_entity_tag = first_arg.split(':')
                     second_arg_tag, obj_entity_tag = second_arg.split(':')
-                    assert first_arg_tag == 'Arg1' and second_arg_tag == 'Arg2', 'Wrong tags of arguments!'
+
+                    if first_arg_tag != 'Arg1' or second_arg_tag != 'Arg2':
+                        continue
+
+                    # assert first_arg_tag == 'Arg1' and second_arg_tag == 'Arg2', 'Wrong tags of arguments!'
 
                     if sub_entity_tag not in entities or obj_entity_tag not in entities:
                         logging.debug('One of entities not found! Skipping...')

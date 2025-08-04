@@ -8,25 +8,30 @@ general:
 
 train:
   criterion: TripletClassificationLoss  # ['CrossEntropyLoss', 'TripletLoss', 'TripletClassificationLoss']
-  batch_size: 32
-  num_epochs: 3
+  batch_size: 8
+  num_epochs: 5
   weight_decay: 0.1
   learning_rate: 1.0e-5  # The initial learning rate for Adam.
-  warmup_steps: 500
+  warmup_steps: 300
   adam_epsilon: 1.0e-6  # Epsilon for Adam optimizer.
   max_grad_norm: 1.0  # Max gradient norm.
   gradient_accumulation_steps: 1  # Number of updates steps to accumulate before performing a backward/update pass
-  eval_frequency: 100
-  eval_batch_size: 64
+  eval_frequency: 300
+  eval_batch_size: 16
   triplet_margin: 0.5
 
 model:
-  name: intfloat/e5-large-v2  # ['intfloat/e5-base-v2', 'intfloat/e5-large-v2', 'intfloat/multilingual-e5-large', 'bert-base-cased', 'DeepPavlov/rubert-base-cased']
+  name: intfloat/multilingual-e5-large  # ['intfloat/e5-base-v2', 'intfloat/e5-large-v2', 'intfloat/multilingual-e5-large', 'bert-base-cased', 'DeepPavlov/rubert-base-cased']
   relation_embedding_size: 1024
   dropout_rate: 0.1
 
 dataset:
-  path: ./datasets/prepared/WebNLG/
-  max_len: 200
+  # path: ./datasets/prepared/SciTextMiner_ru_ru/
+  path: ./datasets/prepared/SciTextMiner_ru_kz/
+  max_len: 400
+  
   use_predefined_split: True
   use_zero_shot_split: False
+
+  # use_predefined_split: False
+  # use_zero_shot_split: True

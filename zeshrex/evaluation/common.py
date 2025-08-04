@@ -106,7 +106,7 @@ def visualize_clusters(
     fig, ax = plt.subplots(figsize=(10, 10))
     for label, proj_list in grouped.items():
         proj = np.array(proj_list)
-        ax.scatter(proj[:, 0], proj[:, 1], c=f'C{label}', s=10, label=label_to_relation[label])
+        ax.scatter(proj[:, 0], proj[:, 1], c=f'C{label}', s=70, label=label_to_relation[label])
 
     plt.legend()
 
