@@ -111,8 +111,11 @@ venv.bak/
 .idea
 
 # Local storages
-datasets/
+datasets/raw/
+datasets/prepared/
+datasets/archives/
 models/
 output/
 logs/
 tmp/
+docs/

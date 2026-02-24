@@ -1,0 +1,12 @@
+[flake8]
+
+exclude = .git, mlgis, dlgis, nlpgis, .venv, venv, tmp
+max-line-length = 120
+inline-quotes = '
+multiline-quotes = """
+
+# E722: bare except
+# W503: line break before binary operator
+# W504: line break after binary operator
+# E203: whitespace before ':' (black requirement)
+ignore = E722, W503, W504, E203
